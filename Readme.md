@@ -16,7 +16,7 @@
 6. Install pip-installable packages `pip install svgutils dtoolbioimage ray`
 7. Install inkscape (needed for figure generation) `sudo apt-get install inkscape`
 
-Alternatively to 4-6, the conda environment can be recreated using
+Alternatively to 4-7, the conda environment can be recreated using
 `conda env create -f environment.yml`
 (this specifies the precise versions of packages used by the authors)
 

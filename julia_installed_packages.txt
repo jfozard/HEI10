@@ -1,0 +1,43 @@
+  
+  JuliaPro_v1.4.0-1
+  
+  [c7e460c6] ArgParse v1.1.0
+  [c52e3926] Atom v0.12.10 ⚲
+  [6e4b80f9] BenchmarkTools v0.5.0
+  [3a865a2d] CuArrays v2.1.0
+  [459566f4] DiffEqCallbacks v2.13.2
+  [aae7a2af] DiffEqFlux v1.7.0
+  [1130ab10] DiffEqParamEstim v1.14.0
+  [41bf760c] DiffEqSensitivity v6.13.0
+  [0c46a032] DifferentialEquations v6.11.0
+  [31c24e10] Distributions v0.23.3
+  [6a86dc24] FiniteDiff v2.3.1
+  [587475ba] Flux v0.10.4
+  [f6369f11] ForwardDiff v0.10.10
+  [7073ff75] IJulia v1.20.0
+  [4076af6c] JuMP v0.21.2
+  [e5e0dc1b] Juno v0.8.1 ⚲
+  [c03570c3] Memoize v0.4.3
+  [76087f3c] NLopt v0.5.1
+  [54ca160b] ODEInterface v0.4.6
+  [09606e27] ODEInterfaceDiffEq v3.6.0
+  [429524aa] Optim v0.20.6
+  [1dea7af3] OrdinaryDiffEq v5.29.0
+  [9b87118b] PackageCompiler v1.1.0
+  [4722fa14] PkgAuthentication v0.1.2
+  [14b8a8f1] PkgTemplates v0.6.4
+  [91a5bcdd] Plots v0.29.4
+  [c46f51b8] ProfileView v0.6.5
+  [d330b81b] PyPlot v2.9.0
+  [37e2e3b7] ReverseDiff v1.2.0
+  [47a9eef4] SparseDiffTools v1.3.3
+  [684fba80] SparsityDetection v0.1.1
+  [2913bbd2] StatsBase v0.32.2
+  [f3b207a7] StatsPlots v0.14.5
+  [c3572dad] Sundials v3.8.3
+  [9f7883ad] Tracker v0.2.6
+  [fce5fe82] Turing v0.11.0
+  [e88e6eb3] Zygote v0.4.20
+  [9a3f8284] Random 
+  [2f01184e] SparseArrays 
+

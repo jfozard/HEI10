@@ -1,11 +1,14 @@
+## Installation instructions for Ubuntu 20.04.1LTS ( Linux 5.4.0-53-generic )
 
-## Installation instructions for Ubuntu 20.04LTS
+(Installation has only been tested on this system; Ryzen 3600 with 32GB )
 
-1. Install Julia, ideally using the free version of JuliaPro (v1.4.0-1) https://juliacomputing.com/products/juliapro/
-1b. Alternatively download julia `wget https://julialang-s3.julialang.org/bin/linux/x64/1.4/julia-1.4.2-linux-x86_64.tar.gz && tar zxvf julia-1.4.2-linux-x86_64.tar.gz`
+1. Install Julia, ideally using the free version of JuliaPro (v1.4.0-1) https://juliacomputing.com/products/juliapro/ 
+   Alternatively download julia `wget https://julialang-s3.julialang.org/bin/linux/x64/1.4/julia-1.4.2-linux-x86_64.tar.gz && tar zxvf julia-1.4.2-linux-x86_64.tar.gz`
 2. Install julia packages - either using the Pkg REPL - see https://docs.julialang.org/en/v1/stdlib/Pkg/ 
    or through running `julia add_packages.jl`
    Required Julia packages are : ArgParse DifferentialEquations DiffEqCallbacks Random SparseArrays StatsBase Distributions
+   Precise details of complete julia environment used listed in `julia_installed_packages.txt`
+
 3. Install conda (via https://docs.conda.io/en/latest/miniconda.html ; or `https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh` )
 4. Create a new conda environment `conda create -n crossover python=3.7` . This needs to be python3.7 to reproduce image analysis results correctly.
 5. Activate this conda environment `conda activate crossover`
@@ -29,7 +32,7 @@
 6. Run `bash all_plots.sh` . Figures will be placed in `output/figures` folder.
 
 
-## To run short test of simulation code
+## To run short test of simulation code (c 1 min)
 
 1. Ensure that Julia and the needed packages are installed (1. and 2. of Installation instructions)
 2. `julia new_sim.jl --n 2` (The julia executable may need to be added to your PATH).

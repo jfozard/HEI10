@@ -11,8 +11,28 @@ import statsmodels.api as sm
 
 import matplotlib as mpl
 
+import json
+
 from matplotlib.colors import to_rgba_array
 
+from statsmodels.stats.weightstats import ttest_ind
+from scipy.stats import mannwhitneyu, f_oneway, kruskal
+
+import rpy2
+
+from rpy2.robjects.packages import importr
+
+utils = importr('utils')
+
+#utils.chooseCRANmirror(ind=1)
+#utils.install_packages('dunn.test')
+#utils.install_packages('kruskal')
+
+import rpy2.robjects as robjects
+
+dunn = importr('dunn.test')
+#kruskal_r = importr('kruskal.test')
+stats = importr('stats')
 
 # Update matplotlib parameters
 mpl.rcParams.update({ #'figure.figsize': (6.0,4.0),  
@@ -29,6 +49,7 @@ mpl.rcParams.update({ #'figure.figsize': (6.0,4.0),
     
 })
 
+from matplotlib import lines
 
 LARGE_FS = 32
 
@@ -54,7 +75,7 @@ def pc(peaks, alpha=alpha_max, criterion='max'):
 
 # Linear regression best-fit line
 # Returns best fit line on range (max(min_x, min(x), max(x))
-def lin_fit(x, y, min_x=None, of=None):
+def lin_fit(x, y, min_x=None, of=None, r2=False):
     X = np.array(x)
     Y = np.array(y)
     X2 = sm.add_constant(X)
@@ -70,9 +91,10 @@ def lin_fit(x, y, min_x=None, of=None):
         X = np.linspace(min_x, np.max(X), 100)
     X2 = sm.add_constant(X)
     yy = est2.predict(X2)
-    
-    return X, yy
-
+    if not r2:
+        return X, yy
+    else:
+        return X, yy, est2.rsquared
 
 ## Analysis of each dataset 
 def analyse_data(A, data):
@@ -81,7 +103,7 @@ def analyse_data(A, data):
     o_hei10_traces = data['o_hei10_traces']
     orig_trace_lengths = data['orig_trace_lengths']
 
-    print(len(A), len(all_peak_data), len(o_hei10_traces), len(orig_trace_lengths))
+    #print(len(A), len(all_peak_data), len(o_hei10_traces), len(orig_trace_lengths))
     
     stages = []
     cell_id = []
@@ -104,7 +126,7 @@ def analyse_data(A, data):
         all_quality += [(A.iloc[i:i+5]['quality']==1).all()]*5
         all_good += ['y' if (A.iloc[i:i+5]['good trace?']=='y').all() else 'n']*5
         chromosome_id += list(range(5))
-        median_all = np.mean(np.concatenate([o_hei10_traces[k] for k in range(i,i+5)]))
+        median_all = np.median(np.concatenate([o_hei10_traces[k] for k in range(i,i+5)]))
         std_all = np.std(np.concatenate([o_hei10_traces[k] for k in range(i,i+5)]))
         for j in range(i, i+5):
             p, h, l = all_peak_data[j]
@@ -117,8 +139,9 @@ def analyse_data(A, data):
                 sig_peaks.append(pp[0])
                 
                 orig_peak_hei10.append(h[pp[0]])
-                
-                h=(h-median_all) #/std_all
+
+                h = h-np.median(h)
+                #h=(h-median_all) #/std_all
                 #h = (h-np.mean(h))/np.std(h)
 
                 new_peak_hei10.append(h[pp[0]])
@@ -142,7 +165,7 @@ def analyse_data(A, data):
     A['all_good']=all_good
     A['sig_peaks']= sig_peaks
     A['num_sig_peaks']=[len(p) for p in sig_peaks]
-    A['new_peak_hei10']=new_peak_hei10     # HEI10 intensities at peaks, with mean cell HEI10 levels subtracted
+    A['new_peak_hei10']=new_peak_hei10     # HEI10 intensities at peaks, with median cell HEI10 levels subtracted
     A['orig_peak_hei10']=orig_peak_hei10   # Raw HEI10 intensities at peaks
 
 
@@ -199,7 +222,7 @@ def analyse_data(A, data):
 
 
 
-def plot_data(A, image_output_path, data_fn, max_n, stacked_bins, summary_fn):
+def plot_data(A, image_output_path, data_fn, max_n, stacked_bins, summary_fn, summary_fn2):
 
 
 
@@ -308,18 +331,22 @@ def plot_data(A, image_output_path, data_fn, max_n, stacked_bins, summary_fn):
     for i in range(0, len(A.index), 5):
         if A.all_stage[i] == 'late' and any(A.quality[j]==1 for j in range(i, i+5)):
             nc += 1
-            print(A.iloc[i], file=summary_file)
+            #print(A.iloc[i], file=summary_file)
+            print("USED", i, A.all_stage[i], 'All quality:', A.all_quality[i], 'All good:', A.all_good[i], file=summary_file)
         else:
-            print("NOT USED", file=summary_file)
-            print(A.iloc[i], file=summary_file)
-            print(A.quality[i:i+5], file=summary_file)
+            print("NOT USED", i, A.all_stage[i], 'All quality: ', A.all_quality[i], 'All good: ', A.all_good[i], file=summary_file)
+#            print(A.iloc[i], file=summary_file)
+#            print(A.quality[i:i+5], file=summary_file)
 
     print('SCs from ' + str(nc) + ' cells', file=summary_file)
+
 
 
     # Restrict data to SCs from late cells with good quality traces
     A_late = A.loc[(A.all_stage=='late') & (A.quality==1)]
 
+    print('Length of A_late', len(A_late))
+                  
     # Histogram of spacing between significant peaks (in terms of real length)
     # e.g. Fig 2h
     pos = []
@@ -343,11 +370,15 @@ def plot_data(A, image_output_path, data_fn, max_n, stacked_bins, summary_fn):
     # Find numbers of plants and SCs used
     cs = []
     for i in A_late.index:
-        cs.append((A_late.Date[i], A_late.Plant[i]))
+        cs.append((A_late.Genotype[i], A_late.Date[i], A_late.Plant[i]))
 
-    cs = set(cs)
+    cs = list(set(cs))
+    cs.sort()
 
+    print('Plant names', cs, file=summary_file)
+    
     print(' Data from {} Plants'.format(len(cs)), file=summary_file)
+
 
     
     print('Data from {} SC'.format(len(A_late)), file=summary_file)
@@ -427,6 +458,34 @@ def plot_data(A, image_output_path, data_fn, max_n, stacked_bins, summary_fn):
         data_x.append(x)
 
     print('Linear regression new_centre', file=summary_file)
+    X, yy, r2 = lin_fit(data_c, data_x, of=summary_file, r2=True)
+
+
+    plt.figure()
+    plt.plot(data_c, data_x, 'rx')
+    plt.plot(X, yy, 'b')
+    plt.title('N='+str(len(data_x)) + f'    $R^2$ = {r2:.2f}')
+    #    plt.text(0.1, 0.9, , transform = plt.gca().transAxes)
+    #plt.xlabel('Bivalent fraction closest to CO')
+    plt.xlabel('Midpoint relative position')
+    plt.ylabel('Left CO relative intensity', size=22)
+    plt.savefig(image_output_base+'new_centre.svg')
+    plt.close()
+
+
+    data_c = []
+    data_x = []
+    for i in A_late2.index:
+
+
+        c = A_late2['sig_peaks'][i]/A_late2['trace_length'][i]
+        c = np.minimum(c, 1-c) 
+        
+        x = A_late2['new_peak_hei10'][i]/np.sum(A_late2['new_peak_hei10'][i])
+        data_c += list(c)
+        data_x += list(x)
+
+    print('Linear regression new_centre2', file=summary_file)
     X, yy = lin_fit(data_c, data_x, of=summary_file)
 
 
@@ -434,20 +493,21 @@ def plot_data(A, image_output_path, data_fn, max_n, stacked_bins, summary_fn):
     plt.title('N='+str(len(data_x)))
     plt.plot(data_c, data_x, 'rx')
     plt.plot(X, yy, 'b')
-    plt.xlabel('Midpoint relative position')
-    plt.ylabel('Relative intensity left CO', size=24)
-    plt.savefig(image_output_base+'new_centre.svg')
+    plt.xlabel('Bivalent fraction closest to CO')
+    plt.ylabel('Left CO relative intensity', size=22)
+    plt.savefig(image_output_base+'new_centre2.svg')
     plt.close()
-
 
 
     # fig 1b right panel
 
     # Normalize sum of hei10 peaks for each cell
+    ncells = 0
     norm_hei10 = []
     norm_peaks = dict((i,[]) for i in range(1,4))
     for i in range(0, len(A), 5):
         if A.Stage[i]=='late' and A.all_good[i]=='y':
+            ncells +=1
             hei10 = []
             hei10_all = []
             for j in range(i, i+5):
@@ -471,13 +531,107 @@ def plot_data(A, image_output_path, data_fn, max_n, stacked_bins, summary_fn):
         plt.hist(norm_peaks[i], histtype='step', label=label_map[i], density=True, lw=2)
 
         print('Single double triple new ' + str(i) + ' ' + str(len(norm_peaks[i])), file=summary_file)
+
+    print('single double tripple', [len(norm_peaks[i]) for i in norm_peaks], 'ncells', ncells)
         
     plt.xlabel('Relative HEI10 focus intensity')
     plt.ylabel('Frequency density')
     plt.legend()
     plt.savefig(image_output_base+'single_double_triple_peak_new_intensities.svg')
 
+
+    # Write normalized peaks into text file
+
+    with open(image_output_base+'single_double_triple.json', 'w') as of123:
+        json.dump(norm_peaks, of123)
     
+
+
+    
+
+        
+    h_max = max([max(u) for u in norm_peaks.values()])
+    fig, ax = plt.subplots(3,1)
+    fig.subplots_adjust(left=0.15, right=0.8, bottom=0.15, top=0.9)
+    y_pos = []
+    for i in range(3):
+        ax[i].hist(norm_peaks[i+1], range=(0, h_max))#, histtype='step', density=True, lw=2, )
+        #ax[i].set_ylim(0, 20)
+        #ax[i].set_yticks([0,20])
+        if i<2:
+            ax[i].set_xticks([])
+        ax[i].tick_params('y', labelsize=15)
+        ax[i].text(0.8, 0.7, label_map[i+1], size=14,  transform=ax[i].transAxes)
+        ax[i].text(0.8, 0.5, 'n={}'.format(len(norm_peaks[i+1])), size=14,  transform=ax[i].transAxes)
+        #ax[i].set_ylabel(label_map[i+1], size=20)
+        pp = ax[i].get_position()
+        y_pos.append(0.5*(pp.y0+pp.y1))
+        print(pp.x1, 0.5*(pp.y0+pp.y1))
+
+
+    data = rpy2.robjects.ListVector([('single', robjects.FloatVector(norm_peaks[1])),
+                                     ('double', robjects.FloatVector(norm_peaks[2])),
+                                     ('triple', robjects.FloatVector(norm_peaks[3])) ] )
+                                     
+
+    out = dunn.dunn_test(data, method='bonferroni', list='TRUE', altp='TRUE', kw='TRUE')
+    print(out, file=summary_file)
+
+    out2 = stats.kruskal_test(data)
+    print(out2[0], file=summary_file)
+
+    
+    chi2, Z, pvals, pvals_adj, compare = out
+    
+        
+    for i0, i1, idx in [[0,1, 0], [1,2, 2]]:
+        l = lines.Line2D([0.81, 0.83, 0.83, 0.81], [y_pos[i0]-0.02, y_pos[i0]-0.02, y_pos[i1]+0.02, y_pos[i1]+0.02], transform = fig.transFigure, lw=2, color='k')
+
+        Z_val = Z[idx]
+        p_val = pvals[idx]
+        p_adj = pvals_adj[idx]
+        c = compare[idx]
+        
+#        _, p_val, _ = ttest_ind(norm_peaks[i0+1], norm_peaks[i1+1])
+#        u_val, p_val = mannwhitneyu(norm_peaks[i0+1], norm_peaks[i1+1], alternative='two-sided')
+
+#        print('ttest_ind', i0+1, i1+1, ttest_ind(norm_peaks[i0+1], norm_peaks[i1+1]), 'n=', len(norm_peaks[i0+1]), len(norm_peaks[i1+1]), file=summary_file)
+#        print('mann_whitney', i0+1, i1+1, mannwhitneyu(norm_peaks[i0+1], norm_peaks[i1+1]), 'n=', len(norm_peaks[i0+1]), len(norm_peaks[i1+1]), file=summary_file)
+
+        
+        fig.text(0.87, 0.5*(y_pos[i0]+y_pos[i1]), f'p={p_adj:.1e}', fontsize=15, rotation=90, ha='center', va='center')
+        #fig.text(0.88, 0.5*(y_pos[i0]+y_pos[i1]), f'Z={Z_val:.1f} ', fontsize=8, rotation=90, ha='center', va='center')
+        fig.lines.append(l)
+
+    for i0, i1, idx in [[0,2, 1]]:
+        l = lines.Line2D([0.81, 0.91, 0.91, 0.81], [y_pos[i0]+0.02, y_pos[i0]+0.02, y_pos[i1]-0.02, y_pos[i1]-0.02], transform = fig.transFigure, lw=2, color='k')
+        #_, p_val, _ = ttest_ind(norm_peaks[i0+1], norm_peaks[i1+1])
+#        u_val, p_val = mannwhitneyu(norm_peaks[i0+1], norm_peaks[i1+1], alternative='two-sided')
+
+        Z_val = Z[idx]
+        p_val = pvals[idx]
+        p_adj = pvals_adj[idx]
+        c = compare[idx]
+
+        
+        fig.text(0.95, 0.5*(y_pos[i0]+y_pos[i1]), f'p={p_adj:.1e}', fontsize=15, rotation=90, ha='center', va='center')
+#        fig.text(0.96, 0.5*(y_pos[i0]+y_pos[i1]), f'Z={Z_val:.2f}', fontsize=8, rotation=90, ha='center', va='center')
+        fig.lines.append(l)
+
+ #       print('ttest_ind', i0+1, i1+1, ttest_ind(norm_peaks[i0+1], norm_peaks[i1+1]), 'n=', len(norm_peaks[i0+1]), len(norm_peaks[i1+1]), file=summary_file)
+#        print('mann_whitney', i0+1, i1+1, mannwhitneyu(norm_peaks[i0+1], norm_peaks[i1+1]), 'n=', len(norm_peaks[i0+1]), len(norm_peaks[i1+1]), file=summary_file)
+        
+    ax= fig.add_axes([0.15, 0.15, 0.7, 0.8], frame_on=False)
+
+    plt.tick_params(labelcolor="none", bottom=False, left=False)
+    #ax.set_xlabel('Relative HEI10 focus intensity', size=20)
+    #ax.set_ylabel('Frequency density', size=20)
+    plt.savefig(image_output_base+'single_double_triple_peak_new_intensities_stacked.svg')
+
+    print('single double triple kruskal', kruskal(norm_peaks[1], norm_peaks[2], norm_peaks[3]), file=summary_file)
+    print('single double triple anova', f_oneway(norm_peaks[1], norm_peaks[2], norm_peaks[3]), file=summary_file)
+
+        
   
     # fig 1b middle two panels
     label_map = { 1:'single', 2:'double', 3:'triple'}
@@ -506,15 +660,16 @@ def plot_data(A, image_output_path, data_fn, max_n, stacked_bins, summary_fn):
                         
             plt.plot(norm_lengths, norm_hei10, 'ro')
             print(title+' Relative bivalent length vs Relative total focus HEI10 per bivalent', file=summary_file)
-            yy = lin_fit(norm_lengths, norm_hei10, min_x=0, of=summary_file)
-            plt.plot(*yy,'r-')
+            xx, yy, r2 = lin_fit(norm_lengths, norm_hei10, min_x=0, of=summary_file, r2=True)
+            plt.plot(xx, yy,'r-')
 #            plt.title(title)
             plt.xlim(xmin=0)
             if num_co!=2:
                 plt.ylim(ymin=0)
+            plt.text(0.1, 0.9, f'$R^2$ = {r2:.2f}', transform = plt.gca().transAxes)
 
-            plt.xlabel('Relative bivalent length')
-            plt.ylabel('Relative total focus HEI10 per bivalent')
+#            plt.xlabel('Relative bivalent length')
+#            plt.ylabel('Relative total focus HEI10 per bivalent')
 #            plt.tight_layout()
             plt.savefig(image_output_base+prefix+out_fn)
     
@@ -523,6 +678,8 @@ def plot_data(A, image_output_path, data_fn, max_n, stacked_bins, summary_fn):
     # Fig 1b left panel        
     plt.figure()
 
+
+    used_sc = {}
     for stage, criterion, col in [ ('late', lambda s: s=='late', 'r'),
                               ('mid', lambda s: s=='mid' or s=='Mid', 'b'),
                                    ('early', lambda s: s=='early', 'g') ]:
@@ -530,16 +687,28 @@ def plot_data(A, image_output_path, data_fn, max_n, stacked_bins, summary_fn):
             
         norm_lengths = []
         norm_hei10 = []
+        used_sc[stage] = 0
         for i in range(0, len(A), 5):
             print(i, A.Stage[i], A.all_good[i])
             if criterion(A.Stage[i]):# and A.all_good[i]=='y':
+
+                median_all = np.median(np.concatenate([o_hei10_traces[j] for j in range(i,i+5)]))
+
                 hei10 = []
+                hei10_all = []
+                
+                
                 for j in range(i, i+5):
 
                     h = o_hei10_traces[j]
                     #h = np.maximum(h - np.median(h), 0)
-                    h = h - np.median(h)
+                    h = h - np.median(h) #median_all
+
+                    #h = h-median_all
+                    #h = np.maximum(h - median_all, 0)
                     hei10.append(np.sum(h))
+                    used_sc[stage] +=1
+
                 hei10 = np.array(hei10)
                 hei10 = hei10/np.sum(hei10)
                 lengths = A['SC length'][i:i+5]
@@ -547,26 +716,97 @@ def plot_data(A, image_output_path, data_fn, max_n, stacked_bins, summary_fn):
                 num_peaks = A['num_sig_peaks'][i:i+5]
                 norm_lengths+= list(lengths)
                 norm_hei10 += list(hei10)
-                    
         print(stage, np.mean(norm_lengths), np.std(norm_lengths), file=summary_file)
         plt.plot(norm_lengths, norm_hei10, col+'o', markersize=2)
 
         print(stage + '  Relative bivalent length vs Relative total focus HEI10 per bivalent', file=summary_file)
-
         
-        yy = lin_fit(norm_lengths, norm_hei10, min_x=0, of=summary_file)
-        plt.plot(*yy,col+'-', label=stage)
-#    plt.title('Total HEI10 above median')
+        xx, yy, r2 = lin_fit(norm_lengths, norm_hei10, min_x=0, of=summary_file, r2=True)
+#        plt.plot(xx,yy,col+'-', label=stage + f'  $R^2$ = {r2:.2f}' )
+        plt.plot(xx,yy,col+'-', label=stage + f' {r2:.2f}' )
+
+    #    plt.title('Total HEI10 above median')
     plt.xlim(xmin=0)
     plt.ylim(ymin=0)
-    plt.xlabel('Relative bivalent SC length')
-    plt.ylabel('Relative total HEI10 per SC')
-    plt.legend()
+#    plt.xlabel('Relative bivalent SC length')
+#    plt.ylabel('Relative total HEI10 per SC')
+    plt.legend(fontsize=18)
  #   plt.tight_layout()
 
     plt.savefig(image_output_base+'rel_length_tot_compare.svg')
 
 
+    print('rel_length_tot_compare SC numbers', used_sc, file=summary_file)
+
+    ### Calulate late total foci number per cell and total SC length per cell.
+
+
+    cell_idx = []
+    cell_total_SC = []
+#    cell_num_peaks = []
+
+    sc_length_all = []
+    
+    for i in range(0, len(A), 5):
+        if A.Stage[i]=='late' and A.all_good[i]=='y':
+            total_SC = 0
+#            total_peaks = 0
+            sc_length = []
+            for j in range(i, i+5):
+                total_SC += A['SC length'][j]
+#                total_peaks += A['num_sig_peaks'][j]
+                sc_length.append(A['SC length'][j])
+            sc_length.sort()
+            cell_idx.append(i//5)
+            cell_total_SC.append(total_SC)
+#            cell_num_peaks.append(total_peaks)
+
+            sc_length_all.append(sc_length)
+
+
+
+    cell_total_SC_all = []
+    
+    for i in range(0, len(A), 5):
+        if True: #A.Stage[i]=='late':
+            total_SC = 0
+#            total_peaks = 0
+            for j in range(i, i+5):
+                total_SC += A['SC length'][j]
+            cell_total_SC_all.append(total_SC)
+
+    cell_num_peaks = []
+
+    for i in range(0, len(A), 5):
+        if A.Stage[i]=='late':
+            total_peaks = 0
+            for j in range(i, i+5):
+                total_peaks += A['num_sig_peaks'][j]
+            cell_num_peaks.append(total_peaks)
+
+
+            
+    
+
+    summary_file2 = open(summary_fn2, 'w')
+    summary_file2.write('cell_idx, total_SC, num_oeaks\n')
+    for d in zip(cell_idx, cell_total_SC, cell_num_peaks):
+       # summary_file2.write(','.join(map(str, d))+'\n')
+         summary_file2.write('{}, {}, {}\n'.format(d[0], d[1], d[2]))
+
+
+    print('Cell SC length mean / std', np.mean(cell_total_SC), np.std(cell_total_SC, ddof=1), len(cell_total_SC))
+    print('Cell SC length all  include bad mean / std', np.mean(cell_total_SC_all), np.std(cell_total_SC_all, ddof=1), len(cell_total_SC_all))
+
+    print('Cell late CO number mean / std', np.mean(cell_num_peaks),  np.std(cell_num_peaks, ddof=1), len(cell_num_peaks))
+    print('Mean SC lengths', np.mean(sc_length_all, axis=0), np.var(sc_length_all, axis=0, ddof=1), len(sc_length_all))
+
+    print('Cell SC length all include bad mean / std (using n-1)', np.mean(cell_total_SC_all), np.std(cell_total_SC_all, ddof=1), len(cell_total_SC_all), file=summary_file)
+
+    print('Cell SC length mean / std (using n-1)', np.mean(cell_total_SC), np.std(cell_total_SC, ddof=1), len(cell_total_SC), file=summary_file)
+    print('Cell late CO number mean / std (using n-1)', np.mean(cell_num_peaks),  np.std(cell_num_peaks, ddof=1), len(cell_num_peaks), file=summary_file)
+    print('Mean SC lengths', np.mean(sc_length_all, axis=0), np.std(sc_length_all, axis=0, ddof=1), len(sc_length_all), file=summary_file)
+    
 
 ## Plot hei10 (mean) intensity traces along a specific SC
 def plot_traces(data_fn, csv_fn, idx_list, image_output_path):
@@ -598,17 +838,18 @@ def plot_traces(data_fn, csv_fn, idx_list, image_output_path):
         
 
 data_output_path = 'data_output/'
+data_output_path2 = 'data_output/'
 image_output_path='data_output/' 
 
 
-for image_output_base, csv_fn, data_fn, max_n, stacked_bins, summary_fn in  [
-        ( image_output_path, '200406.csv', data_output_path+'test.pkl', 4, np.linspace(0, 0.3, 30), data_output_path+'summary.txt'),
-        ( image_output_path+'ox_', 'OX.csv', data_output_path+'test_ox.pkl', 4, np.linspace(0, 0.12, 11), data_output_path+'summary_ox.txt'),
-        ( image_output_path+'ux_', 'UX.csv', data_output_path+'test_ux.pkl', 3, np.linspace(0, 0.3, 10), data_output_path+'summary_ux.txt'),
+for image_output_base, csv_fn, data_fn, max_n, stacked_bins, summary_fn, summary_fn2 in  [
+        ( image_output_path, '200406.csv', data_output_path+'test.pkl', 4, np.linspace(0, 0.3, 30), data_output_path2+'summary.txt', data_output_path2+'cell_summary.txt'),
+        ( image_output_path+'ox_', 'OX.csv', data_output_path+'test_ox.pkl', 4, np.linspace(0, 0.12, 11), data_output_path2+'summary_ox.txt', data_output_path2+'cell_summary_ox.txt'),
+        ( image_output_path+'ux_', 'UX.csv', data_output_path+'test_ux.pkl', 3, np.linspace(0, 0.3, 10), data_output_path2+'summary_ux.txt', data_output_path2+'cell_summary_ux.txt'),
         ]:
     A = pd.read_csv(csv_fn)
-    plot_data(A, image_output_base, data_fn, max_n, stacked_bins, summary_fn)
-
+    plot_data(A, image_output_base, data_fn, max_n, stacked_bins, summary_fn, summary_fn2)
+    print(image_output_path)
 
 # Plots of HEI10 traces along individual chromosomes (used for panels in Fig1A, 3A and 4A)
 plot_traces(data_output_path+'test.pkl', '200406.csv', [675, 664, 492 ], image_output_path)

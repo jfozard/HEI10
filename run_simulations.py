@@ -29,15 +29,25 @@ default_params = {
     't_C0_ratio2': 2.0, # Increased RI loading at SC telomeres f_e (a.u.) - used for simulations without centromeres
     't_C0_ratio_L': 2.0, # Increased RI loading at LH telomere end (a.u.) - used for simulations with centromeres
     't_C0_ratio_R': 2.0, # Increased RI loading at RH telomere end (a.u.) - used for simulations with centromeres
-    'Lm': [ 37.3, 40.1, 45.3, 53.3, 59.3 ], # Mean arabidopsis SC lengths
-    'Ls': [ 4.71, 4.81, 5.52, 6.86, 7.06 ], # Standard deviation of arabidopsis SC lengths
-
+#    'Lm': [ 37.3, 40.1, 45.3, 53.3, 59.3 ], # Mean arabidopsis SC lengths
+#    'Ls': [ 4.71, 4.81, 5.52, 6.86, 7.06 ], # Standard deviation of arabidopsis SC lengths
+    'Lm': [ 37.5, 40.4, 45.8, 53.8, 59.7 ], # Mean arabidopsis SC lengths
+    'Ls': [ 4.93, 5.06, 5.86, 7.18, 7.13 ], # Standard deviation of arabidopsis SC lengths
     'ratio': 1.0,  # Multiplicative factor modifying HEI10 loading (on both SC and at RI) for UX / OX simulations
     'length_ratio':1.0, # Multiplicative factor used to rescale SC lengths to compare female/male meiosis
 }
 
 
+## Simulations with alternative escape rates
+escape_params = copy(default_params)
 
+escape_params['C0_base'] = 0.93
+escape_params['C0_noise_base'] = 0.30
+escape_params['u0_base'] = 0.16
+escape_params['t_C0_ratio2'] = 1.5
+escape_params['t_C0_ratio_L'] = 1.5
+escape_params['t_C0_ratio_R'] = 1.5
+escape_params['n_alpha'] = 1.0
 
 ### Changes to matplotlib parameters for plotting figure panels
 mpl.rcParams.update({ 
@@ -260,13 +270,14 @@ def run_simulations(params):
     )
 
     ## Simulations to generate histograms of CO density etc
-
+    """
     # WT
     simulate(
         params,
         output_dir=output_base+"survey_julia_new_ends/",
     )
 
+    """
     # OX
     simulate(
         params,        
@@ -318,4 +329,37 @@ def run_simulations(params):
 
 
 
+def run_extra_simulations(escape_params):
+
+
+    print(escape_params)
+
+    output_base = escape_params['output_base']
+
+    ## Check that output directory exists
+    os.makedirs(output_base+'/julia_plots', exist_ok=True)
+
+    # WT
+    simulate_kymo(escape_params,
+                  "escape_kymo",
+                  output_dir=output_base+'/kymo/',
+                  julia_script="kymo_escape.jl",
+
+    )
+
+
+    ## Simulations to generate histograms of CO density etc
+
+    # WT
+    simulate(
+        escape_params,
+        output_dir=output_base+"survey_escape/",
+        julia_script="new_sim_escape.jl",
+
+    )
+
+
 run_simulations(default_params)
+
+# Additional simulations with modified escape rates
+run_extra_simulations(escape_params)

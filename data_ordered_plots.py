@@ -118,7 +118,7 @@ def analyse_data_ordered(A, data):
 
                 orig_peak_hei10.append(h[pp[0]])
                 
-                h=(h-median_all) 
+                h=h-np.median(h) #(h-median_all) 
 
                 new_peak_hei10.append(h[pp[0]])
 
@@ -202,7 +202,7 @@ def analyse_data_ordered(A, data):
     A['rel_peak_int_cell']=rel_peak_int_cell
     """
 
-
+    """
     new_rel_peak_int_cell = []
     for i in range(0, len(A), 5):
         new_peak_int = A['new_peak_hei10'][i:i+5]
@@ -212,7 +212,7 @@ def analyse_data_ordered(A, data):
             new_rel_peak_int_cell.append(new_rel_peak_int)
 
     A['new_rel_peak_int_cell']=new_rel_peak_int_cell
-
+    """
 
     trace_order = []
     long_peaks_dapi_resample = []

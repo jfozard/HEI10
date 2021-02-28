@@ -5,7 +5,6 @@ using ArgParse
 
 using DifferentialEquations
 using DiffEqCallbacks
-using LinearAlgebra
 using Random
 using SparseArrays
 using StatsBase
@@ -105,25 +104,32 @@ function norm(x)
 end
 
 # RI HEI10 escape rate function (\beta(C)*C in equation (2) )
-function betaC(C, K, n_c)
-    C ./ (1 .+ (C / K) .^ n_c)
+# Modified escape rate to explore importance of the precise functional form of this term
+
+
+function betaC(C, K, n_c, n_alpha)
+    C ./ (1.0 .+ exp( (C ./ K) .* n_alpha) .* n_c)
 end
 
 # RI HEI10 escape rate function \beta(C)*C (evaluated in place)
-function betaC!(dC, C, K, n_c)
-    @. dC = C ./ (1 .+ (C ./ K) .^ n_c)
+function betaC!(dC, C, K, n_c, n_alpha)
+#    @. dC = C .* exp( -((C ./ K) .^ n_alpha ) * n_c)
+     @. dC = C ./ (1.0 .+ exp( (C ./ K) .* n_alpha) .* n_c)
+
 end
 
-# Derivative of (\beta(C)*C) wrt C 
-function d_betaC(C::Float64, K::Float64, n_c::Float64)::Float64
-    1 ./ (1.0 .+ (C ./ K) .^ n_c) .-
-    C ./ (1.0 .+ (C ./ K) .^ n_c) .^ 2 .* (n_c ./ K) .* (C ./ K) .^ (n_c - 1)
+# Derivative of (\beta(C)*C) wrt C
+function d_betaC(C::Float64, K::Float64, n_c::Float64, n_alpha::Float64)::Float64
+#     exp( -((C ./ K).^ n_alpha) * n_c) *(1 .- n_c .* n_alpha .* (C .^(n_alpha-1))/ (K .^ n_alpha))
+      1.0 ./ (1.0 .+ exp( (C ./ K) .* n_alpha ) .* n_c) -
+      C .* n_c .* (n_alpha ./ K) .* exp((C ./ K) .* n_alpha) ./ (1.0 .+ exp( (C ./ K) .* n_alpha ) .* n_c).^2
+
 end
 
 # Derivative of (\beta(C)*C) wrt C (evaluated in place)
-function d_betaC!(dbC, C, K, n_c)
-    @. dbC = 1 ./ (1.0 .+ (C ./ K) .^ n_c) .-
-    C ./ (1.0 .+ (C ./ K) .^ n_c) .^ 2 .* (n_c ./ K) .* (C ./ K) .^ (n_c - 1)
+function d_betaC!(dbC, C, K, n_c, n_alpha)
+    @. dbC =  1.0 ./ (1.0 .+ exp( (C ./ K) .* n_alpha ) .* n_c) -
+     C .* n_c .* (n_alpha ./ K) .* exp((C ./ K) .* n_alpha) ./ (1.0 .+ exp( (C ./ K) .* n_alpha ) .* n_c).^2
 end
 
 
@@ -142,6 +148,7 @@ function basic_ode!(dyy::Array{Float64,1}, yy::Array{Float64,1}, p, t::Float64)
     betaC!,      # beta(C)*C function (passed to ODE for efficiency)
     d_betaC,     # derivative of beta(C)*C function wrt C
     n_c,         # Hill coefficient (\gamma)
+    n_alpha,
     a_nodes,     # RI HEI10 absorption rate from SC (\alpha)
     b_nodes,     # RI HEI10 escape rate back onto SC (\beta)
     b2_nodes,    # RI HEI10 escape rate into nucleoplasm  (not used)
@@ -168,7 +175,7 @@ function basic_ode!(dyy::Array{Float64,1}, yy::Array{Float64,1}, p, t::Float64)
     @inbounds dyy[m] = alpha - beta * y[m] + h * (y[m-1] - y[m])
 
     # Calculate escape of HEI10 back onto SC.
-    betaC!(bC, max.(C,0.0), K, n_c)
+    betaC!(bC, max.(C,0.0), K, n_c, n_alpha)
 
     # Calculate net fluxes from SC to RIs, and update ODE RHS for appropriate SC compartment
     @inbounds for j = 1:N
@@ -195,6 +202,7 @@ function jac!(J, yy, p, t)
     betaC!,
     d_betaC,
     n_c,
+    n_alpha,
     a_nodes,
     b_nodes,
     b2_nodes,
@@ -216,7 +224,7 @@ function jac!(J, yy, p, t)
     dbC::Float64 = 0.0
     idx::Int64 = 0
     @inbounds for j = 1:N
-        dbC = d_betaC(max(0, C[j]), K, n_c)
+        dbC = d_betaC(max(C[j],0.0), K, n_c, n_alpha)
         J[m+j, m+j] = -(b_nodes + b2_nodes) * dbC - b3_nodes
         J[nodes[j], m+j] = b_nodes * dbC / dL
         J[m+j, nodes[j]] = a_nodes
@@ -244,6 +252,7 @@ function simulate_video(idx, args)
     xm = (0.5:1.0:m) * dL
 
     n_c::Float64 = Float64(args["n_c"])
+    n_alpha::Float64 = Float64(args["n_alpha"]) # Hill coefficient (gamma)
     K::Float64 = Float64(args["K"])
     alpha = 0.0
     beta = 0.0
@@ -306,7 +315,8 @@ function simulate_video(idx, args)
         dL,
         betaC!,
         d_betaC,
-	n_c,
+        n_c,
+        n_alpha,
         a_nodes,
         b_nodes,
         b2_nodes,
@@ -375,6 +385,10 @@ function parse_commandline()
     	    arg_type=Float64
     	    default=1.25 # (no units)
             help="Hill coefficient for RI unbinding" # (\gamma) Hill coefficient for escape of HEI10 from RI
+        "--n_alpha"
+            arg_type=Float64
+            default=1.0 # (no units)
+            help="Hill coefficient for RI unbinding" # (\gamma) Hill coefficient for escape of HEI10 from RI
         "--a_nodes"
             arg_type=Float64
             default=2.1 # (um s^{-1})
@@ -385,23 +399,23 @@ function parse_commandline()
             help="unbinding rate at RIs" # (\beta) RI HEI10 escape rate back onto SC
         "--u0"
             arg_type=Float64
-            default=1.2 # (a.u.)
+            default=0.16 # (a.u.)
             help="initial HEI10 concentration" # (c_0) HEI10 initial loading on SC
         "--C0"
             arg_type=Float64
-            default=6.8 # (a.u.)
+            default=0.93 # (a.u.)
             help="initial RI HEI10" # (C_0) HEI10 initial RI loading
         "--C0_noise"
             arg_type=Float64
-            default=2.2 # *(a.u.)
-            help="initial RI HEI10 noise" # (\sigma) Noise in HEI10 initial RI loading 
+            default=0.30 # *(a.u.)
+            help="initial RI HEI10 noise" # (\sigma) Noise in HEI10 initial RI loading
         "--D"
             arg_type=Float64
             default=1.1 # (um^2 s^{-1}) 
             help="HEI10 diffusion constant on SC"  # (D_c) RI Diffusion coefficient on SC 
         "--t_C0_ratio2"
             arg_type=Float64
-            default=2.0 # (no units)
+            default=1.5 # (no units)
 	    help="initial hei10 ratio for RIs in telomeres"  # (f_e) Increased RI loading at SC telomeres
 	"--t_exp"
 	    help="exponential functions for telomeres"

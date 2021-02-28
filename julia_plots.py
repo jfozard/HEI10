@@ -124,7 +124,7 @@ def summary(data, L, K, tp=-1, max_k=4):
 
 
 
-def lin_fit(x, y):
+def lin_fit(x, y, r2=False):
     X = np.array(x)
     Y = np.array(y)
     X2 = sm.add_constant(X)
@@ -134,8 +134,10 @@ def lin_fit(x, y):
     X = np.linspace(np.min(X), np.max(X), 100)
     X2 = sm.add_constant(X)
     yy = est2.predict(X2)
-    return X, yy
-
+    if not r2:
+        return X, yy
+    else:
+        return X, yy, est2.rsquared
 
 
 def plot_centre(all_data, tp=-1):
@@ -156,16 +158,19 @@ def plot_centre(all_data, tp=-1):
 
 
     idx = list(range(len(c)))
+    if len(idx) < 206:
+        print('too few double CO')
+        return
     s = random.sample(idx, 206)
     c = np.array(c)
     v = np.array(v)
     
     plt.plot(c[s], v[s], 'rx')
-    X, yy = lin_fit(c[s], v[s])
+    X, yy, r = lin_fit(c[s], v[s], r2=True)
     plt.plot(X, yy, 'b-')
-    plt.title("N="+str(len(c[s]))+" (sample)")
+    plt.title("N="+str(len(c[s]))+" (sample)" + f'    $R^2$ = {r:.2f}')
     plt.xlabel("Midpoint relative position")
-    plt.ylabel("Relative intensity left CO", size=24)
+    plt.ylabel("Left CO relative intensity", size=22)
     plt.autoscale(enable=True, axis='x', tight=True)
 
     
@@ -595,6 +600,7 @@ def count_CO(data_path):
 
 
 def main(sim_data_path, output_path):
+    make_plots((sim_data_path+'/survey_escape/', 'at_'),  output_path+'/escape_',  intensity_bins=np.linspace(0,0.3,30))
     make_plots((sim_data_path+'/survey_julia_new_ends/', 'at_'), output_path+'/new_end_', intensity_bins=np.linspace(0,0.3,30))
     make_plots((sim_data_path+'/survey_julia_ox/', 'at_'),  output_path+'/ox_new_end_', centre_plot=False, intensity_bins=np.linspace(0,0.12,11), max_n=7)
     make_plots((sim_data_path+'/survey_julia_ux/', 'at_'),  output_path+'/ux_new_end_',  intensity_bins=np.linspace(0,0.3,10), max_n=3)
@@ -605,8 +611,8 @@ def main(sim_data_path, output_path):
     wt_co = count_CO((sim_data_path+'/survey_julia_new_ends/', 'at_'))
     female_co = count_CO((sim_data_path+'/survey_female/', 'at_'))
 
-
-    print('wt co, female co, ratio', wt_co, female_co, female_co/wt_co)
+    with open(output_path+'/summmary_female.txt', 'w') as f:
+        print('wt co, female co, ratio', wt_co, female_co, female_co/wt_co, file=f)
     
 main(sys.argv[1], sys.argv[2])
                 

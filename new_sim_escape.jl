@@ -1,11 +1,9 @@
 
 
-
 using ArgParse
 
 using DifferentialEquations
 using DiffEqCallbacks
-using LinearAlgebra
 using Random
 using SparseArrays
 using StatsBase
@@ -48,7 +46,7 @@ function interp1d(x::Number, x0::Array, y0::Array)
 end
 
 
-# Piecewise constant interpolation 
+# Piecewise constant interpolation
 function piecewise(x::Number, x0::Array, y0::Array)
     # x - position to evaluate function
     # x0 - positions of discontinuities in function
@@ -105,25 +103,32 @@ function norm(x)
 end
 
 # RI HEI10 escape rate function (\beta(C)*C in equation (2) )
-function betaC(C, K, n_c)
-    C ./ (1 .+ (C / K) .^ n_c)
+# Modified escape rate to explore importance of the precise functional form of this term
+
+
+function betaC(C, K, n_c, n_alpha)
+    C ./ (1.0 .+ exp( (C ./ K) .* n_alpha) .* n_c)
 end
 
 # RI HEI10 escape rate function \beta(C)*C (evaluated in place)
-function betaC!(dC, C, K, n_c)
-    @. dC = C ./ (1 .+ (C ./ K) .^ n_c)
+function betaC!(dC, C, K, n_c, n_alpha)
+#    @. dC = C .* exp( -((C ./ K) .^ n_alpha ) * n_c)
+     @. dC = C ./ (1.0 .+ exp( (C ./ K) .* n_alpha) .* n_c)
+
 end
 
-# Derivative of (\beta(C)*C) wrt C 
-function d_betaC(C::Float64, K::Float64, n_c::Float64)::Float64
-    1 ./ (1.0 .+ (C ./ K) .^ n_c) .-
-    C ./ (1.0 .+ (C ./ K) .^ n_c) .^ 2 .* (n_c ./ K) .* (C ./ K) .^ (n_c - 1)
+# Derivative of (\beta(C)*C) wrt C
+function d_betaC(C::Float64, K::Float64, n_c::Float64, n_alpha::Float64)::Float64
+#     exp( -((C ./ K).^ n_alpha) * n_c) *(1 .- n_c .* n_alpha .* (C .^(n_alpha-1))/ (K .^ n_alpha))
+      1.0 ./ (1.0 .+ exp( (C ./ K) .* n_alpha ) .* n_c) -
+      C .* n_c .* (n_alpha ./ K) .* exp((C ./ K) .* n_alpha) ./ (1.0 .+ exp( (C ./ K) .* n_alpha ) .* n_c).^2
+
 end
 
 # Derivative of (\beta(C)*C) wrt C (evaluated in place)
-function d_betaC!(dbC, C, K, n_c)
-    @. dbC = 1 ./ (1.0 .+ (C ./ K) .^ n_c) .-
-    C ./ (1.0 .+ (C ./ K) .^ n_c) .^ 2 .* (n_c ./ K) .* (C ./ K) .^ (n_c - 1)
+function d_betaC!(dbC, C, K, n_c, n_alpha)
+    @. dbC =  1.0 ./ (1.0 .+ exp( (C ./ K) .* n_alpha ) .* n_c) -
+     C .* n_c .* (n_alpha ./ K) .* exp((C ./ K) .* n_alpha) ./ (1.0 .+ exp( (C ./ K) .* n_alpha ) .* n_c).^2
 end
 
 
@@ -142,6 +147,7 @@ function basic_ode!(dyy::Array{Float64,1}, yy::Array{Float64,1}, p, t::Float64)
     betaC!,      # beta(C)*C function (passed to ODE for efficiency)
     d_betaC,     # derivative of beta(C)*C function wrt C
     n_c,         # Hill coefficient (\gamma)
+    n_alpha,
     a_nodes,     # RI HEI10 absorption rate from SC (\alpha)
     b_nodes,     # RI HEI10 escape rate back onto SC (\beta)
     b2_nodes,    # RI HEI10 escape rate into nucleoplasm  (not used)
@@ -168,7 +174,7 @@ function basic_ode!(dyy::Array{Float64,1}, yy::Array{Float64,1}, p, t::Float64)
     @inbounds dyy[m] = alpha - beta * y[m] + h * (y[m-1] - y[m])
 
     # Calculate escape of HEI10 back onto SC.
-    betaC!(bC, max.(C,0.0), K, n_c)
+    betaC!(bC, max.(C,0.0), K, n_c, n_alpha)
 
     # Calculate net fluxes from SC to RIs, and update ODE RHS for appropriate SC compartment
     @inbounds for j = 1:N
@@ -181,7 +187,7 @@ function basic_ode!(dyy::Array{Float64,1}, yy::Array{Float64,1}, p, t::Float64)
 end
 
 
-# Function to calculate the Jacobian of the ODE system RHS - helps implicit integration method be more efficient 
+# Function to calculate the Jacobian of the ODE system RHS - helps implicit integration method be more efficient
 # Result returned in-place as first argument
 function jac!(J, yy, p, t)
     m, # For parameter interpretation please see basic ODE
@@ -195,6 +201,7 @@ function jac!(J, yy, p, t)
     betaC!,
     d_betaC,
     n_c,
+    n_alpha,
     a_nodes,
     b_nodes,
     b2_nodes,
@@ -216,7 +223,7 @@ function jac!(J, yy, p, t)
     dbC::Float64 = 0.0
     idx::Int64 = 0
     @inbounds for j = 1:N
-        dbC = d_betaC(max(0, C[j]), K, n_c)
+        dbC = d_betaC(max(C[j],0.0), K, n_c, n_alpha)
         J[m+j, m+j] = -(b_nodes + b2_nodes) * dbC - b3_nodes
         J[nodes[j], m+j] = b_nodes * dbC / dL
         J[m+j, nodes[j]] = a_nodes
@@ -225,48 +232,60 @@ function jac!(J, yy, p, t)
 end
 
 
+function simulate(idx, args)
 
-function simulate_video(idx, args)
-
+    # Initialize random number generator with seed for this simulation
     mt = MersenneTwister(idx)
 
-
+    # Generate SC length, sampled from Normal distribution clipped to +/- 3 S.D.
     L::Float64 = Float64(args["L"])+Float64(args["Ls"])*clamp(randn(mt), -3, 3)
+    # Calculate appropriate number of RIs for this SC length
     N::Int64 = Int64(round(L*args["density"]))
+    # Number of intervals for spatial discretization of SC
     m::Int64 = Int64(args["m"])
 
-    x::Array{Float64,1} = L * sort(rand(mt, N))
+    # Generate random RI positions
+    x0 = sort(rand(mt, N))
+    x::Array{Float64,1} = L * x0
 
+    # Length of each interval in  SC discretization
     dL::Float64 = L / m
+    # Calculate indices of SC intervals containing each RI
     nodes = map(a -> ceil(Int, a), x / dL)
 
-
+    # Midpoints of each SC interval
     xm = (0.5:1.0:m) * dL
 
-    n_c::Float64 = Float64(args["n_c"])
-    K::Float64 = Float64(args["K"])
-    alpha = 0.0
-    beta = 0.0
-    a_nodes::Float64 = Float64(args["a_nodes"])
-    b_nodes::Float64 = Float64(args["b_nodes"])
-    b2_nodes = 0.0
-    b3_nodes = 0.0
-    D::Float64 = Float64(args["D"])
+    n_c::Float64 = Float64(args["n_c"]) # Hill coefficient (gamma)
+    n_alpha::Float64 = Float64(args["n_alpha"]) # Hill coefficient (gamma)
+    K::Float64 = Float64(args["K"]) # Hill threshold (K_C)
 
-    bC = zeros(Float64, N)
-    A = zeros(Float64, N)
+    alpha = 0.0 # HEI10 production rate on SC (Not used here)
+    beta = 0.0 # HEI10 decay rate on SC (Not used here)
+    a_nodes::Float64 = Float64(args["a_nodes"]) # RI HEI10 absorption rate from SC (\alpha)
+    b_nodes::Float64 = Float64(args["b_nodes"]) # RI HEI10 escape rate back onto SC (\beta)
+    b2_nodes = 0.0 # RI escape rate (loss to nuceloplasm) - not used here
+    b3_nodes = 0.0 # RI constant escape rate (loss to nuceloplasm) - not used here
+    D::Float64 = Float64(args["D"]) # RI Diffusion coefficient on SC (D_c)
 
+    bC = zeros(Float64, N) # Buffer to store values of \beta(C)*C in ODE calculation avoiding allocating memory
+    A = zeros(Float64, N) # Buffer to store fluxes of HEI10 from RI to SC in ODE calculation
+
+    # Initial uniform HEI10 concentration (c) on SC
     u0::Array{Float64,1} = fill(Float64(args["u0"]), m)
-    C0_t = 1.0 
-    C0_t2::Float64 = Float64(args["t_C0_ratio2"])
 
-
+    # Initialize truncated normal distribution for RI HEI10 loading
+    # Mean C0_noise (C_0)
+    # Standard deviation C0_noise (\sigma)
+    # Truncated at +/- 3 s.d.
     d = Truncated(Normal(Float64(args["C0"]), Float64(args["C0_noise"])), max(0, Float64(args["C0"])-3*Float64(args["C0_noise"])), Float64(args["C0"])+3*Float64(args["C0_noise"]))
 
-
+    # Generate initial RI HEI10 amounts
     C0::Array{Float64,1} = rand(mt, d, N)
-    C0[C0.<0] .= 0.0
+    C0[C0.<0] .= 0.0 # Double-check that initial RI HEI10 concentrations are non-negative
 
+    C0_t = 1.0
+    C0_t2::Float64 = Float64(args["t_C0_ratio2"]) # ($f_e$)
     t_L::Float64 = Float64(args["t_L"])
 
 
@@ -306,7 +325,8 @@ function simulate_video(idx, args)
         dL,
         betaC!,
         d_betaC,
-	n_c,
+        n_c,
+        n_alpha,
         a_nodes,
         b_nodes,
         b2_nodes,
@@ -322,9 +342,31 @@ function simulate_video(idx, args)
     cb = PositiveDomain(g2) # Additional constraint to ensure non-negativity of concentration values during integration
 
     # Solve ODE system using implicit Rodas5 solver, with tight relative error tolerance
-    sol = solve(prob_g,Rodas5(autodiff=:false), cb=cb, reltol=1e-12)
-    # Return simulation results at all timepoints
-    (sol, x, xm, L, N)
+    sol = solve(prob_g,Rodas5(autodiff=:false),cb=cb, retol=1e-12, save_everystep=false)
+    # Return final state
+    (L, x, sol.u[end])
+end
+
+function simulate_all(args, io)
+
+    # Parallel threaded loop to run simulations for n consecutive seeds, beginning at "start"
+    m::Int64 = args["m"]
+    solution_data = Vector{Vector{}}()
+    for i in 1:Threads.nthreads()
+        push!(solution_data,String[])
+    end
+    Threads.@threads for i in args["start"]:args["start"]+(args["n"]-1)
+
+        L, x, u = simulate(i, args)
+        push!(solution_data[Threads.threadid()], string(L) *'\n'*join(map(string, x), ',')*'\n'*join(map(string, u[m+1:end]), ',')*'\n')
+    end
+
+    # Combine data from all threads and write to output file
+
+    data = vcat(solution_data...)
+    for i in 1:length(data)
+        println(io, data[i])
+    end
 end
 
 
@@ -337,27 +379,30 @@ function parse_commandline()
     s = ArgParseSettings()
 
     @add_arg_table! s begin
-        "--filename"
-            default="kymo.png"
+        "--filename_base"
+            default="test"
             help="base filename"
-	"--timecourse"
-        action = :store_true
-	    help="timecourse instead"
-	"--start"
-           arg_type=Int
-           default=1
-           help="first seed"
+        "--start"
+            arg_type=Int
+            default=1
+            help="first seed to use for the simulation"
+        "--n"
+            arg_type=Int
+            default=100 # (No unit)
+            help="number of seeds" # Number of different SCs to simulate, using a different RNG seed for each one
         "--n_ts"
             arg_type=Int
-            default=100
-            help="number of timesteps"
+            default=100 # (no unit)
+            help="number of timesteps" # Number of integration periods (again, timestep for numerical integration is shorter)
+	                               # In actual fact, for this simulation there is a single integration period of length
+				       # n_ts * dt, as only final state is of interest.
         "--L"
 	    arg_type=Float64
-	    default=45.8 # (um)
+	    default=30.0 #(um)
             help="length of chromosome" # Mean length of this SC
-        "--Ls"
+       "--Ls"
             arg_type=Float64
-	    default=5.86 # (um)
+	    default=0.0 # (um)
             help="std dev in length of chromosome"  # Variation in length of this SC
         "--dt"
      	    arg_type=Float64
@@ -366,42 +411,46 @@ function parse_commandline()
         "--m"
 	    arg_type=Int
 	    default=2000 # (no unit)
-            help="number of elements" # (M) Number of intervals for spatial discretization of SC 
+            help="number of elements" # (M) Number of intervals for spatial discretization of SC
         "--K"
      	    arg_type=Float64
             default=1.0 # (a.u.)
-            help="threshold for RI unbinding" # (K_C) Hill function thresold for escape of HEI10 from RI 
+            help="threshold for RI unbinding" # (K_C) Hill function thresold for escape of HEI10 from RI
         "--n_c"
     	    arg_type=Float64
     	    default=1.25 # (no units)
+            help="Hill coefficient for RI unbinding" # (\gamma) Hill coefficient for escape of HEI10 from RI
+        "--n_alpha"
+            arg_type=Float64
+            default=1.0 # (no units)
             help="Hill coefficient for RI unbinding" # (\gamma) Hill coefficient for escape of HEI10 from RI
         "--a_nodes"
             arg_type=Float64
             default=2.1 # (um s^{-1})
             help="binding rate at RIs" # (\alpha) RI HEI10 absorption rate from SC
         "--b_nodes"
-            arg_type=Float64 
+            arg_type=Float64
             default=0.5 # (s^{-1})
             help="unbinding rate at RIs" # (\beta) RI HEI10 escape rate back onto SC
         "--u0"
             arg_type=Float64
-            default=1.2 # (a.u.)
+            default=0.16 # (a.u.)
             help="initial HEI10 concentration" # (c_0) HEI10 initial loading on SC
         "--C0"
             arg_type=Float64
-            default=6.8 # (a.u.)
+            default=0.93 # (a.u.)
             help="initial RI HEI10" # (C_0) HEI10 initial RI loading
         "--C0_noise"
             arg_type=Float64
-            default=2.2 # *(a.u.)
-            help="initial RI HEI10 noise" # (\sigma) Noise in HEI10 initial RI loading 
+            default=0.30 # *(a.u.)
+            help="initial RI HEI10 noise" # (\sigma) Noise in HEI10 initial RI loading
         "--D"
             arg_type=Float64
-            default=1.1 # (um^2 s^{-1}) 
-            help="HEI10 diffusion constant on SC"  # (D_c) RI Diffusion coefficient on SC 
+            default=1.1 # (um^2 s^{-1})
+            help="HEI10 diffusion constant on SC"  # (D_c) RI Diffusion coefficient on SC
         "--t_C0_ratio2"
             arg_type=Float64
-            default=2.0 # (no units)
+            default=1.5 # (no units)
 	    help="initial hei10 ratio for RIs in telomeres"  # (f_e) Increased RI loading at SC telomeres
 	"--t_exp"
 	    help="exponential functions for telomeres"
@@ -409,42 +458,49 @@ function parse_commandline()
         "--t_L"
             arg_type=Float64
             default=0.1 # (no units)
-            help="telomere rel length" # (x_e) Telomere length as fraction of bivalent 
+            help="telomere rel length" # (x_e) Telomere length as fraction of bivalent
         "--density"
             arg_type=Float64
             default=0.5         # (um^{-1})
             help="RI density"  # (\rho) SC RI density
-        end
+    end
     return parse_args(s)
 end
 
 
-function kymo_sol()
-    n_args = parse_commandline()
+function main()
+    args = parse_commandline()
     println("Parsed args:")
-
-    for (arg,val) in n_args
-        println("$arg=$val")
+    for (arg,val) in args
+        println("  $arg  =>  $val")
     end
 
-    sol, x, xm, L, N = simulate_video(n_args["start"], n_args)
-
-    t = range(0, stop=sol.t[end], length=100)
-    u0 = hcat(sol.u...)
-    u = hcat(sol(t)...)
-
-    @show(u[2001:end, end])
-    @show(sum(u[2001:end, end].>1))
-
-
-    open(n_args["filename"],"w") do io
-       print(io, string(L) * ", " *string(sol.t[end]) *'\n'*join(map(string, x), ',')*'\n')
-       for i=1:100
-           v=sol(t[i])[2001:end]
-           print(io, join(map(string, v), ',')*'\n') 
-       end
+    # Generate filename depending on parameter values
+    filename=[]
+    for (arg,val) in args
+    	if length(arg)<8 || arg[1:8]!="filename"
+	   push!(filename, "$val")
+	end
+    end
+    # Add filename prefix
+    if !isnothing(args["filename_base"])
+        filename = args["filename_base"] * join(filename, ",") * ".dat"
+    else
+	filename = join(filename, ",") * ".dat"
     end
 
+
+    println("filename", filename)
+    open(filename,"w") do io
+        # Write parameter values as first line of output file
+        println(io, "#Namespace(" * join(map(x-> string(x[1]) *"="*string(x[2]), collect(args)), ",") * ")")
+
+        # Run (group of) simulations
+        simulate_all(args, io)
+    end
+    println("done")
 end
 
-kymo_sol()
+#fac = 0.137; plot_obj([1.1, 6.8*fac, 2.2*fac, 1.2*fac, 1.5, 0.1, 2.1, 0.5, 1.25, 1.0]; n=500, m=1000)
+
+main()

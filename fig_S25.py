@@ -153,5 +153,6 @@ def plot_prefix(prefix, julia_input_path, data_input_path, output_path):
 def generate_figures(julia_input_path, data_input_path, output_path):
     plot_prefix('no_end_', julia_input_path, data_input_path, output_path)
     plot_prefix('exp_', julia_input_path, data_input_path, output_path)
+    plot_prefix('escape_', julia_input_path, data_input_path, output_path)
 
 generate_figures(sys.argv[1], sys.argv[2], sys.argv[3])

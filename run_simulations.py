@@ -31,7 +31,7 @@ default_params = {
     't_C0_ratio_R': 2.0, # Increased RI loading at RH telomere end (a.u.) - used for simulations with centromeres
 #    'Lm': [ 37.3, 40.1, 45.3, 53.3, 59.3 ], # Mean arabidopsis SC lengths
 #    'Ls': [ 4.71, 4.81, 5.52, 6.86, 7.06 ], # Standard deviation of arabidopsis SC lengths
-    'Lm': [ 37.5, 40.4, 45.8, 53.8, 59.7 ], # Mean arabidopsis SC lengths
+    'Lm': [ 37.5, 40.4, 45.7, 53.8, 59.8 ], # Mean arabidopsis SC lengths
     'Ls': [ 4.93, 5.06, 5.86, 7.18, 7.13 ], # Standard deviation of arabidopsis SC lengths
     'ratio': 1.0,  # Multiplicative factor modifying HEI10 loading (on both SC and at RI) for UX / OX simulations
     'length_ratio':1.0, # Multiplicative factor used to rescale SC lengths to compare female/male meiosis
@@ -270,14 +270,12 @@ def run_simulations(params):
     )
 
     ## Simulations to generate histograms of CO density etc
-    """
     # WT
     simulate(
         params,
         output_dir=output_base+"survey_julia_new_ends/",
     )
 
-    """
     # OX
     simulate(
         params,        

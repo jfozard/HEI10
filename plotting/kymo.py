@@ -20,6 +20,7 @@ mpl.rcParams.update({ #'figure.figsize': (6.0,4.0),
     'axes.labelsize':28,
     'savefig.edgecolor': 'none',
     'savefig.facecolor': 'none',
+    'svg.fonttype': 'none',
 })
 
 LARGE_FS=32
@@ -78,7 +79,7 @@ def main():
 
     cbar.solids.set_edgecolor("face")
 
-    cbar.set_label("HEI10 (a.u.)")
+    cbar.set_label("HEI10 (arb. units)")
     
     plt.savefig(sys.argv[2])
 #    plt.show()

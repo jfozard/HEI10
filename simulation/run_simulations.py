@@ -10,7 +10,7 @@ from scipy.interpolate import interp1d
 
 ## Simulation parameters
 default_params = {
-    'output_base': 'output/', # Output directory (adjust as appropriate)
+    'output_base': '../output/', # Output directory (adjust as appropriate)
     'K':1, 
     'D':1.1, # HEI10 diffusion constant D (\mu m^2 s^{-1})
     'a_nodes': 2.1, # RI HEI10 absorption rate \alpha (\mu m s^{-1})

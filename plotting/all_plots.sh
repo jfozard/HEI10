@@ -1,5 +1,5 @@
 
-base="output/"
+base="../output/"
 julia_dir=${base}"julia_plots/"
 kymo_dir=${base}"kymo/"
 data_dir="data_output/"
@@ -9,12 +9,12 @@ mkdir -p ${julia_dir}
 mkdir -p ${output_dir}
 
 
+
 python julia_plots.py ${base} ${julia_dir}  
 
 
-python data_analysis_plots.py
-python julia_ordered_plots.py ${base} ${julia_dir}
-python data_ordered_plots.py
+python data_analysis_plots.py ${base}
+
 
 for s in "" no_end_ exp_ escape_; do
     u=${s}kymo
@@ -30,14 +30,15 @@ python fig3_wide.py ${julia_dir} ${data_dir} ${output_dir}
 python fig4_wide.py ${julia_dir} ${data_dir} ${output_dir}
 python female_male.py ${julia_dir} ${data_dir} ${output_dir}
 python fig_S25.py ${julia_dir} ${data_dir} ${output_dir}
-python centromere_fig.py ${julia_dir} ${data_dir} ${output_dir}
+
+python CO_length.py ${julia_dir} ${data_dir} ${output_dir}
+
 
 inkscape ${output_dir}/fig1_final.svg -o ${output_dir}/fig1.png -d 300 -D
 inkscape ${output_dir}/new_end_fig_final.svg -o ${output_dir}/fig2.png -d 300 -D
 inkscape ${output_dir}/ox_new_end_fig_final.svg -o ${output_dir}/fig3.png -d 300 -D
 inkscape ${output_dir}/ux_new_end_fig_final.svg -o ${output_dir}/fig4.png -d 300 -D
-inkscape ${output_dir}/no_end_fig_final.svg -o ${output_dir}/figS2.png -d 300 -D
-inkscape ${output_dir}/female_male.svg -o ${output_dir}/figS3.png -d 300 -D
-inkscape ${output_dir}/centromere_fig.svg -o ${output_dir}/figS4.png -d 300 -D
-inkscape ${output_dir}/escape_fig_final.svg -o ${output_dir}/fig_escape.png -d 300 -D
-inkscape extra_panels/figS5.svg -o ${output_dir}/figS5.png -d 300 -D
+inkscape ${output_dir}/no_end_fig_final.svg -o ${output_dir}/figS3.png -d 300 -D
+inkscape ${output_dir}/female_male.svg -o ${output_dir}/figS4.png -d 300 -D
+inkscape ${output_dir}/CO_length.svg -o ${output_dir}/figS5.png -d 300 -D
+inkscape ${output_dir}/escape_fig_final.svg -o ${output_dir}/figS6.png -d 300 -D

@@ -81,11 +81,17 @@ def summary(data, L, K, tp=-1, max_k=4):
     for L, pos, hei10 in all_data:
         if len(pos) and len(hei10) and tp<len(hei10) and len(pos)==len(hei10[tp]):
             idx = pc(hei10[tp])
+#            print(idx)
+            if len(idx) == sum(idx):
+                idx = []
             all_foci.append(pos[idx]/L)
             foci_intensities.append(hei10[tp][idx]/np.sum(hei10[tp][idx]))
             orig_foci_intensities.append(hei10[tp][idx])
             ns += 1
             L_array.append(L)
+        else:
+             print('BAD\n\n\n\n\n\n\n\n\n', pos)
+    
 
     
     foci = [ p for l in all_foci for p in l]
@@ -157,13 +163,19 @@ def plot_centre(all_data, tp=-1):
                     v.append(hei10[tp][idx[0]]/np.sum(hei10[tp][idx]))
 
 
+        
     idx = list(range(len(c)))
     if len(idx) < 206:
         print('too few double CO')
         return
+    random.seed(1234)
     s = random.sample(idx, 206)
     c = np.array(c)
     v = np.array(v)
+
+    with open('centre.pkl', 'wb') as f:
+        pickle.dump([c,v,s], f)
+
     
     plt.plot(c[s], v[s], 'rx')
     X, yy, r = lin_fit(c[s], v[s], r2=True)
@@ -602,6 +614,7 @@ def count_CO(data_path):
 def main(sim_data_path, output_path):
     make_plots((sim_data_path+'/survey_escape/', 'at_'),  output_path+'/escape_',  intensity_bins=np.linspace(0,0.3,30))
     make_plots((sim_data_path+'/survey_julia_new_ends/', 'at_'), output_path+'/new_end_', intensity_bins=np.linspace(0,0.3,30))
+    quit()
     make_plots((sim_data_path+'/survey_julia_ox/', 'at_'),  output_path+'/ox_new_end_', centre_plot=False, intensity_bins=np.linspace(0,0.12,11), max_n=7)
     make_plots((sim_data_path+'/survey_julia_ux/', 'at_'),  output_path+'/ux_new_end_',  intensity_bins=np.linspace(0,0.3,10), max_n=3)
     make_plots((sim_data_path+'/survey_julia_no_ends/', 'at_'), output_path+'/no_end_', intensity_bins=np.linspace(0,0.3,30))

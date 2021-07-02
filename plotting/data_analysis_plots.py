@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import os
 import pickle
 
+import sys
+
 import statsmodels.api as sm
 
 import matplotlib as mpl
@@ -460,6 +462,7 @@ def plot_data(A, image_output_path, data_fn, max_n, stacked_bins, summary_fn, su
     print('Linear regression new_centre', file=summary_file)
     X, yy, r2 = lin_fit(data_c, data_x, of=summary_file, r2=True)
 
+    
 
     plt.figure()
     plt.plot(data_c, data_x, 'rx')
@@ -806,6 +809,9 @@ def plot_data(A, image_output_path, data_fn, max_n, stacked_bins, summary_fn, su
     print('Cell SC length mean / std (using n-1)', np.mean(cell_total_SC), np.std(cell_total_SC, ddof=1), len(cell_total_SC), file=summary_file)
     print('Cell late CO number mean / std (using n-1)', np.mean(cell_num_peaks),  np.std(cell_num_peaks, ddof=1), len(cell_num_peaks), file=summary_file)
     print('Mean SC lengths', np.mean(sc_length_all, axis=0), np.std(sc_length_all, axis=0, ddof=1), len(sc_length_all), file=summary_file)
+
+
+    print('DONE!')
     
 
 ## Plot hei10 (mean) intensity traces along a specific SC
@@ -837,15 +843,15 @@ def plot_traces(data_fn, csv_fn, idx_list, image_output_path):
 
         
 
-data_output_path = 'data_output/'
-data_output_path2 = 'data_output/'
+base = sys.argv[1]
+data_output_path = base+'/data_output/'
 image_output_path='data_output/' 
 
 
 for image_output_base, csv_fn, data_fn, max_n, stacked_bins, summary_fn, summary_fn2 in  [
-        ( image_output_path, '200406.csv', data_output_path+'test.pkl', 4, np.linspace(0, 0.3, 30), data_output_path2+'summary.txt', data_output_path2+'cell_summary.txt'),
-        ( image_output_path+'ox_', 'OX.csv', data_output_path+'test_ox.pkl', 4, np.linspace(0, 0.12, 11), data_output_path2+'summary_ox.txt', data_output_path2+'cell_summary_ox.txt'),
-        ( image_output_path+'ux_', 'UX.csv', data_output_path+'test_ux.pkl', 3, np.linspace(0, 0.3, 10), data_output_path2+'summary_ux.txt', data_output_path2+'cell_summary_ux.txt'),
+        ( image_output_path, '200406.csv', data_output_path+'test.pkl', 4, np.linspace(0, 0.3, 30), data_output_path+'summary.txt', data_output_path+'cell_summary.txt'),
+        ( image_output_path+'ox_', 'OX.csv', data_output_path+'test_ox.pkl', 4, np.linspace(0, 0.12, 11), data_output_path+'summary_ox.txt', data_output_path+'cell_summary_ox.txt'),
+        ( image_output_path+'ux_', 'UX.csv', data_output_path+'test_ux.pkl', 3, np.linspace(0, 0.3, 10), data_output_path+'summary_ux.txt', data_output_path+'cell_summary_ux.txt'),
         ]:
     A = pd.read_csv(csv_fn)
     plot_data(A, image_output_base, data_fn, max_n, stacked_bins, summary_fn, summary_fn2)

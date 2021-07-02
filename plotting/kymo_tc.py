@@ -55,7 +55,7 @@ def main():
         plt.plot(t_data, v)
 
 
-    plt.ylabel('Intensity (a.u.)')
+    plt.ylabel('Intensity (arb. units)')
     plt.xlabel('Time (hr)')
 
     plt.savefig(sys.argv[2])

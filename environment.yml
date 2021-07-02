@@ -1,4 +1,4 @@
-name: crossover2
+name: crossover
 channels:
   - defaults
 dependencies:

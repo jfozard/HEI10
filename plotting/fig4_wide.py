@@ -9,6 +9,7 @@ import sys
 
 def generate_figure(input_julia_path, input_data_path, output_path):
     fig0 = sg.SVGFigure( "210mm", "297mm")
+    fig0.root.set("viewBox", "0 0 210 297")
 
 
     MPL_SCALE = 0.4
@@ -70,7 +71,7 @@ def generate_figure(input_julia_path, input_data_path, output_path):
     # load matpotlib-generated figures
 
 
-    image_panel = sg.ImageElement(open("extra_panels/HEI10 fig 4A.png", "rb"), 1584, 444)
+    image_panel = sg.ImageElement(open("../extra_panels/HEI10 fig 4A.png", "rb"), 1584, 444)
     image_panel.moveto(10,10)
     image_panel.scale_xy(0.48, 0.48)
 
@@ -117,7 +118,8 @@ def generate_figure(input_julia_path, input_data_path, output_path):
     gall.moveto(30,270)
 
     gpage = sg.GroupElement([g_image, gall])
-
+    gpage.scale_xy(0.26, 0.26)
+    
 
     fig0.append([gpage])
 

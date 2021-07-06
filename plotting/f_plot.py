@@ -27,6 +27,6 @@ plt.ylim(0,2)
 plt.xlim(0,1)
 plt.xticks([0,1])
 plt.yticks([0,1,2])
-plt.savefig('f_plot.svg')
+plt.savefig('../output/julia_plots/f_plot.svg')
 
 

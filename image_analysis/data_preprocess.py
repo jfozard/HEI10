@@ -20,7 +20,9 @@ from measure import measure
 ##### Edit this path to point to downloaded dataset
 data_path = '/media/foz/a92bd7ce-a444-4635-8659-b03fda836a5e/JIC/'
 
-os.makedirs('data_output', exist_ok=True)
+data_output_path = '../output/data_output/'
+
+os.makedirs(data_output_path, exist_ok=True)
 
 
 # Combine multiple dictionaries
@@ -251,8 +253,9 @@ def process_data(base_dir, csv_fn, output_fn, category):
         pickle.dump(data, f, protocol=3)
 
 
-data_output_path = 'data_output/'
 
-process_data(data_path +'WT Col-0/', '200406.csv', data_output_path+'test.pkl', 'wt')
-process_data(data_path+'ox/HEI10 overexpressor/', 'OX.csv', data_output_path+'test_ox.pkl', 'ox')
-process_data(data_path+'underexpressor/HEI10 underexpressor/', 'UX.csv', data_output_path+'test_ux.pkl', 'ux')
+
+
+process_data(data_path +'WT Col-0/', '../input_data/200406.csv', data_output_path+'test.pkl', 'wt')
+process_data(data_path+'ox/HEI10 overexpressor/', '../input_data/OX.csv', data_output_path+'test_ox.pkl', 'ox')
+process_data(data_path+'underexpressor/HEI10 underexpressor/', '../input_data/UX.csv', data_output_path+'test_ux.pkl', 'ux')

@@ -1,8 +1,10 @@
 
+set -e
+
 base="../output/"
 julia_dir=${base}"julia_plots/"
 kymo_dir=${base}"kymo/"
-data_dir="data_output/"
+data_dir=${base}"/data_output/"
 output_dir=${base}"figures/"
 
 mkdir -p ${julia_dir}
@@ -13,7 +15,9 @@ mkdir -p ${output_dir}
 python julia_plots.py ${base} ${julia_dir}  
 
 
-python data_analysis_plots.py ${base}
+python data_analysis_plots.py ${base}"/data_output/"
+
+python SC_length_vs_CO_number.py ${data_dir} ${data_dir}
 
 
 for s in "" no_end_ exp_ escape_; do

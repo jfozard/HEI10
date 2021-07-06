@@ -16,6 +16,7 @@ mpl.rcParams.update({ #'figure.figsize': (6.0,4.0),
   'axes.labelsize':28,
     'savefig.edgecolor': 'none',
     'savefig.facecolor': 'none',
+    'svg.fonttype' : 'none',    
     
 })
 

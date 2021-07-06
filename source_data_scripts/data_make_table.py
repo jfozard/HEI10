@@ -152,7 +152,7 @@ def analyse_data(A, data):
 
 
 
-def process_data(csv_fn, pkl_fn, category):
+def process_data(csv_fn, pkl_fn, output_file, output_trace_file, specific_traces, trace_output_paths):
 
     # Read CSV file with data specification
     A = pd.read_csv(csv_fn)
@@ -160,7 +160,7 @@ def process_data(csv_fn, pkl_fn, category):
 
     # Remove some unused columns and rename one field
     A = A.drop(A.columns[[6,7,8,9]], axis=1)
-    A = A.drop(columns=['foci count', 'foci per chromosome', 'comments'])
+    A = A.drop(columns=[x for x in ('foci count', 'foci per chromosome', 'comments') if x in A])
 
     A = A.rename(columns={'Plant ':'Plant'})
 
@@ -183,17 +183,28 @@ def process_data(csv_fn, pkl_fn, category):
 
     print(A.iloc[0])
 
-    A.to_csv('test.csv')
+    A.to_csv(output_file)
 
 
     # Write original hei10 traces to file
 
-    with open('traces.txt', 'w') as f:
+    with open(output_trace_file, 'w') as f:
         for i, v in data['o_hei10_traces'].items():
             f.write(', '.join(map(str, v)) + '\n')
+
+    for i, fn in zip(specific_traces, trace_output_paths):
+        with open(fn, 'w') as f:
+            t = data['o_hei10_traces'][i]
+            for v in t: 
+                f.write(f'{v}' + '\n')
+       
         
     
 
-data_output_path = 'data_output/'
 
-process_data('200406.csv', data_output_path+'test.pkl', 'wt')
+            
+data_output_path = '../output/data_output/'
+
+process_data('../input_data/200406.csv', data_output_path+'test.pkl', '../source_data/fig2_cytology.csv', '../source_data/fig2_cytology_raw_traces.csv', [675, 664, 492], [f'../source_data/fig1a_HEI10_trace_{s}.csv' for s in ['upper', 'mid', 'lower']])
+process_data('../input_data/OX.csv', data_output_path+'test_ox.pkl', '../source_data/fig3_cytology.csv', '../source_data/fig3_cytology_raw_traces.csv', [260], ['../source_data/fig3a_HEI10_trace.csv'])
+process_data('../input_data/UX.csv', data_output_path+'test_ux.pkl', '../source_data/fig4_cytology.csv', '../source_data/fig4_cytology_raw_traces.csv', [115],  ['../source_data/fig4a_HEI10_trace.csv'])

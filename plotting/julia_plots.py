@@ -1,9 +1,15 @@
 import numpy as np
+import os
 import sys
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import csv
 import random
+
+import pickle
+
+import statsmodels.api as sm
+import pandas as pd
 
 
 mpl.rcParams.update({ 
@@ -15,20 +21,19 @@ mpl.rcParams.update({
     'axes.labelsize':28,
     'savefig.edgecolor': 'none',
     'savefig.facecolor': 'none',
+    'svg.fonttype' : 'none',    
     
 })
 
 LARGE_FS=32
 
-import pickle
-
-import statsmodels.api as sm
-
+# Peak criterion
 def pc(v, alpha=0.4):
     idx = (v>=alpha*np.max(v))
     return idx
 
 
+# Code to read output data file
 def read_file(fn):
 
     all_data = []
@@ -65,11 +70,10 @@ def read_file(fn):
     return head_dict, all_data
 
 
-import os
+# Make histograms, length and foci intensity arrays for the data from a single file
 
 def summary(data, L, K, tp=-1, max_k=4):
 
-    print('tp', tp)
     head, all_data = data
 
     all_foci = []
@@ -81,42 +85,32 @@ def summary(data, L, K, tp=-1, max_k=4):
     for L, pos, hei10 in all_data:
         if len(pos) and len(hei10) and tp<len(hei10) and len(pos)==len(hei10[tp]):
             idx = pc(hei10[tp])
-#            print(idx)
             if len(idx) == sum(idx):
                 idx = []
-            all_foci.append(pos[idx]/L)
-            foci_intensities.append(hei10[tp][idx]/np.sum(hei10[tp][idx]))
+            all_foci.append(pos[idx]/L) # Positions normalized to length of SC
+            foci_intensities.append(hei10[tp][idx]/np.sum(hei10[tp][idx]))   # Intensities normalized to sum on the same SC
             orig_foci_intensities.append(hei10[tp][idx])
             ns += 1
             L_array.append(L)
-        else:
-             print('BAD\n\n\n\n\n\n\n\n\n', pos)
     
 
     
-    foci = [ p for l in all_foci for p in l]
+    foci = [ p for l in all_foci for p in l]  # list of all of the (relative) foci positions 
 
-    print('n ch', len(all_foci), 'n f', len(foci))
 
-    n_foci = [len(l) for l in all_foci]
-
-    print('n_foci', n_foci)
-    
-    print("mean peaks", np.mean(n_foci))
-
+    n_foci = [len(l) for l in all_foci] # number of foci on each SC
    
-    hist_n, _ = np.histogram(n_foci, range(20))
+    hist_n, _ = np.histogram(n_foci, range(20)) # Histogram of relative foci numbers
 
-    print(hist_n)
-    
-    hist_nn = {}
+    hist_nn = {} # hist_nn[k] = Histogram of relative foci positions for SCs with k foci
     
     for n in range(1,max_k):
         f = []
         for j in range(len(all_foci)):
             if n_foci[j]==n:
                 f+=list(all_foci[j])
-        hist_nn[n], _ = np.histogram(f, bins=np.linspace(0,1,11))
+        hist_nn[n], _ = np.histogram(f, bins=np.linspace(0,1,11)) 
+
     f = []
     for j in range(len(all_foci)):
         if n_foci[j]>=max_k:
@@ -124,11 +118,12 @@ def summary(data, L, K, tp=-1, max_k=4):
     hist_nn[max_k], _ = np.histogram(f, bins=np.linspace(0,1,11))
 
 
-    hist, _ = np.histogram(foci, bins = np.linspace(0,1,11))
+    hist, _ = np.histogram(foci, bins = np.linspace(0,1,11)) # hist_nn[k] = Histogram of all relative foci positions
 
     return hist_n, hist_nn, hist, len(foci), len(all_foci), L_array, foci_intensities, orig_foci_intensities, all_foci
 
 
+### Linear regression
 
 def lin_fit(x, y, r2=False):
     X = np.array(x)
@@ -146,6 +141,7 @@ def lin_fit(x, y, r2=False):
         return X, yy, est2.rsquared
 
 
+# Plot for fig 2k - for SCs with two COs, rel intensity of left peak vs position of centre
 def plot_centre(all_data, tp=-1):
     
     c = []
@@ -154,7 +150,6 @@ def plot_centre(all_data, tp=-1):
     for L, pos, hei10 in all_data:
         
         if len(pos) and len(hei10) and tp<len(hei10) and len(pos)==len(hei10[tp]):
-            if np.max(hei10[tp])>2*np.mean(hei10[tp]):
                 idx = pc(hei10[tp])
                 idx = np.where(idx)[0]
                 
@@ -173,8 +168,6 @@ def plot_centre(all_data, tp=-1):
     c = np.array(c)
     v = np.array(v)
 
-    with open('centre.pkl', 'wb') as f:
-        pickle.dump([c,v,s], f)
 
     
     plt.plot(c[s], v[s], 'rx')
@@ -187,42 +180,22 @@ def plot_centre(all_data, tp=-1):
 
     
 
-def plot_diff(all_data, order, tp=-1):
-    
-
-    d = []
-    
-    for L, pos, hei10 in all_data:
-        
-        if len(pos) and len(hei10) and tp<len(hei10) and len(pos)==len(hei10[tp]):
-            if np.max(hei10[tp])>2*np.mean(hei10[tp]):
-                idx = pc(hei10[tp])
-                idx = np.where(idx)[0]
-                
-                if len(idx)==order:
-                    p = pos[idx]/L
-                    d += list(np.diff(p))
-    plt.figure()
-    plt.hist(d)
-    plt.title("{:.4g} {:.4g}".format(np.mean(d), np.std(d)))
-    plt.autoscale(enable=True, axis='x', tight=True)
-    
+# Plot spacing between consecutive foci
 def plot_diff_all(all_data, rel=False, tp=-1):
-    
 
     d = []
     
     for L, pos, hei10 in all_data:
         
         if len(pos) and len(hei10) and tp<len(hei10) and len(pos)==len(hei10[tp]):
-          if np.max(hei10[tp])>2*np.mean(hei10[tp]):
                 idx = pc(hei10[tp])
                 idx = np.where(idx)[0]
-                if rel:
-                    p = pos[idx]/L
-                else:
-                    p = pos[idx]
-                d += list(np.diff(p))
+                if len(idx)<len(hei10[tp]):
+                    if rel:
+                        p = pos[idx]/L
+                    else:
+                        p = pos[idx]
+                    d += list(np.diff(p))
     plt.figure()
     plt.title('N='+str(len(d)))
     plt.xlabel('Spacing ($\mu$m)', fontsize=LARGE_FS)
@@ -232,6 +205,7 @@ def plot_diff_all(all_data, rel=False, tp=-1):
 
 
 
+ # Load all data from a directory   
 def load_data(survey_dir, survey_base):
     
     files = os.listdir(survey_dir)
@@ -239,7 +213,6 @@ def load_data(survey_dir, survey_base):
     all_data_ext = {}
     for f in files:
         if len(f)>=len(survey_base) and f[:len(survey_base)] == survey_base:
-            print(f)
             params = f[len(survey_base):-4]
             all_data_ext[params] = read_file(survey_dir+'/'+f)
     
@@ -260,15 +233,14 @@ def load_data(survey_dir, survey_base):
 
     new_data = {}
     for k in all_data_ext:
-        p = get_class(k)[0:8] + get_class(k)[9:]
+        p = get_class(k)[0:8] + get_class(k)[9:] # Omit the starting index from file
         if p in new_data:
             new_data[p][1] += all_data_ext[k][1]
         else:
             h, d = all_data_ext[k]
             new_data[p] = [h, d]
 
-    print(list(new_data))
-    
+
     return new_data
 
 
@@ -278,55 +250,35 @@ def to_val(v):
     except ValueError:
         return float(v)
 
-def line_hist(ax, x, data, label=None):
-    data = [0] + list(np.repeat(data, 2)) + [0]
-    xx = np.repeat(x, 2)
-    print(data, len(data))
-    print(xx, len(xx))
-    ax.plot(xx, data, label=label)
-   # plt.ylim(0, np.max(data)*1.05)
 
-import pandas as pd
+    
 
-
+## Process all output files for WT/OX/UC etc
 def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, max_n=4):
     # Load preprocessed pkl file
     new_data = load_data(*data_path) 
     k = next(iter(new_data))
-    print(k, new_data[k][0])
-    print('loaded data')
 
 
-    print(list(new_data.values())[0])
-    
+    # Organize data into groups 
     new_data_keys = [ (idx, to_val(h['L']), to_val(h['density'])) for idx, (h, v) in enumerate(new_data.values()) ]
     idx, L, density = map(list, zip(*new_data_keys))
     
     df = pd.DataFrame(data={'idx':idx, 'L':L, 'density':density})
         
     df2 = df.sort_values(['L', 'density'])
-
-    print(df2)
     
     df2['density_idx'] = list(range(3))*5
 
-    print(df2)
-
-
-    
     grouped = df2.groupby(['L'])
-    for name, group in grouped:
-        print(name)
-        print(group)
-        print('***')
     
     new_data_list = list(new_data.values())
-
-
 
     all_hist_n = np.zeros((19,))
     all_hist_nn = np.zeros((4, 10))
     all_hist = np.zeros(10,)
+
+    all_lengths = []
     
     all_intensities = []
     
@@ -337,27 +289,23 @@ def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, 
 
     nf_tot = []
 
+    all_nco = []
+
+    
     all_data_1 = []
     all_co = []
 
     for group_idx, (name, group) in enumerate(grouped):
-        print('name', name)
         s = group.iloc[-1,:]
-#        print('s', s)
-        print("s['idx']", s['idx'])
 
         h, v = new_data_list[int(s['idx'])]
 
         all_data_1 += v
         
-        print('h, ', h)
-        
         L = to_val(h['L'])
         density = to_val(h['density'])
         K = to_val(h['K'])
 
-        print('L, density, K', L, density, K)
-                
         hist_n, hist_nn, hist, nf, nch, L_array, intensities, orig_foci_intensities, co = summary((h,v), L, K, tp=-1)
         
         all_intensities.append(orig_foci_intensities)
@@ -369,15 +317,14 @@ def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, 
 
         all_co += co
 
-          
-        print(hist, len(hist))
-
+        all_lengths += list(L_array)
         
+        all_nco += [len(z) for z in co]
+          
         dsb_density = []
         nf_all = []
         for i in range(3):
             s = group.iloc[i,:]
-            print(s)
             j = int(s['idx'])
             dsb_density.append(s['density'])
             _, _, _, nf, nch, _, _, _, _ = summary(new_data_list[j],  L, K, tp=-1)
@@ -387,6 +334,38 @@ def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, 
         
 
 
+
+    plt.figure()
+
+    length_by_nco = [ np.array(all_lengths)[np.array(all_nco)==n] for n in range(1, np.max(all_nco)+1) ] 
+
+    N_data = [str(len(p)) for p in length_by_nco]
+    
+
+    NN = 3
+
+    length_by_nco = [ np.array(all_lengths)[np.array(all_nco)==n] for n in range(1, NN+1) ] 
+
+    
+    plt.violinplot(length_by_nco, positions=np.arange(1,4), showmeans=True, vert=False)
+
+    for i in range(3):
+        plt.annotate('n='+str(len(length_by_nco[i])), (20, i+1+0.2), fontsize=18)
+    
+    plt.xlabel('SC length ($\mu$m)')
+    plt.ylabel('CO number')
+    plt.xticks([20, 40,60,80])
+    plt.yticks([1,2,3])
+    plt.xlim(15,85)
+    
+    plt.savefig(output_prefix+"nco_vs_length.svg")
+
+    with open(output_prefix+'nco_vs_length_data.csv', 'w') as f:
+        f.write('CO_number,SC_length\n')
+        for i in range(3):
+            for v in length_by_nco[i]:
+                f.write(str(i+1) + ','+str(v) + '\n')
+            
     mean_co = np.mean([len(c) for c in co])
 
     if centre_plot:
@@ -401,11 +380,11 @@ def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, 
 
     
     
-    with open('H2A.csv') as f:
+    with open('../input_data/H2A.csv') as f:
         reader = csv.reader(f)
         H2A = list(reader)
 
-    with open('MHL1_diakinesis.csv') as f:
+    with open('../input_data/MHL1_diakinesis.csv') as f:
         reader = csv.reader(f)
         MHL = list(reader)
 
@@ -413,7 +392,6 @@ def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, 
     H2A = np.array([float(p[1]) for p in H2A[:3]])
     MHL = np.array([float(p[1]) for p in MHL[:3]])
 
-    print(H2A, MHL)
     
     dsb_data = H2A/H2A[0]
     CO_data = MHL
@@ -455,10 +433,6 @@ def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, 
     
     plt.savefig(output_prefix+'julia_all_hist.svg')
 
-    print(all_hist_n)
-    print('mean peaks all', np.sum(all_hist_n*np.arange(19))/np.sum(all_hist_n), np.sum(all_hist_n*np.arange(19))/np.sum(all_hist_n)*5)
-
-    print('MHL', MHL)
     
     fig, ax = plt.subplots(2,2)
     for i in range(4):
@@ -530,7 +504,6 @@ def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, 
     plt.close()
 
 
-    print(H2A, MHL)
 
     dsb_density = np.array(dsb_density)
     dsb_density = dsb_density/dsb_density[-1]
@@ -540,16 +513,12 @@ def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, 
 
     CO_data = CO_data/CO_data[0]
 
-
-    print('nf tot', nf_tot)
     
     plt.figure()
     nf2 = np.mean(np.array(nf_tot), axis=0)
     CO_sim = nf2/1000.0
     CO_sim = CO_sim/CO_sim[-1]
 
-
-    print(dsb_density, CO_sim)
     
     plt.plot(dsb_density, CO_sim)
     plt.plot(dsb_data, CO_data, 'rx')
@@ -576,10 +545,6 @@ def count_CO(data_path):
 
     
     grouped = df2.groupby(['L'])
-    for name, group in grouped:
-        print(name)
-        print(group)
-        print('***')
     
     new_data_list = list(new_data.values())
 
@@ -590,19 +555,14 @@ def count_CO(data_path):
     for group_idx, (name, group) in enumerate(grouped):
         print('name', name)
         s = group.iloc[-1,:]
-#        print('s', s)
-        print("s['idx']", s['idx'])
 
         h, v = new_data_list[int(s['idx'])]
 
-        print('h, ', h)
         
         L = to_val(h['L'])
         density = to_val(h['density'])
         K = to_val(h['K'])
 
-        print('L, density, K', L, density, K)
-                
         hist_n, hist_nn, hist, nf, nch, L_array, intensities, orig_foci_intensities, co = summary((h,v), L, K, tp=-1)
 
         co_tot += nf
@@ -612,9 +572,9 @@ def count_CO(data_path):
 
 
 def main(sim_data_path, output_path):
-    make_plots((sim_data_path+'/survey_escape/', 'at_'),  output_path+'/escape_',  intensity_bins=np.linspace(0,0.3,30))
     make_plots((sim_data_path+'/survey_julia_new_ends/', 'at_'), output_path+'/new_end_', intensity_bins=np.linspace(0,0.3,30))
-    quit()
+    make_plots((sim_data_path+'/survey_escape/', 'at_'),  output_path+'/escape_',  intensity_bins=np.linspace(0,0.3,30))
+
     make_plots((sim_data_path+'/survey_julia_ox/', 'at_'),  output_path+'/ox_new_end_', centre_plot=False, intensity_bins=np.linspace(0,0.12,11), max_n=7)
     make_plots((sim_data_path+'/survey_julia_ux/', 'at_'),  output_path+'/ux_new_end_',  intensity_bins=np.linspace(0,0.3,10), max_n=3)
     make_plots((sim_data_path+'/survey_julia_no_ends/', 'at_'), output_path+'/no_end_', intensity_bins=np.linspace(0,0.3,30))

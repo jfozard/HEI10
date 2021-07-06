@@ -733,48 +733,23 @@ def plot_data(A, image_output_path, max_n, stacked_bins, summary_fn, summary_fn2
     print('Mean SC lengths', np.mean(sc_length_all, axis=0), np.std(sc_length_all, axis=0, ddof=1), len(sc_length_all), file=summary_file)
     
 
-## Plot hei10 (mean) intensity traces along a specific SC
-def plot_traces(data_fn, csv_fn, idx_list, image_output_path):
-    A = pd.read_csv(csv_fn)
-
-    with open(data_fn, 'rb') as f:
-        data = pickle.load(f)
-        all_peak_data, orig_trace_lengths = data['all_peak_data'], data['orig_trace_lengths']
-        o_hei10_traces = data['o_hei10_traces']  # Don't have dapi data for UX.
-    for i in idx_list:
-        plt.figure()
-        v = np.array(o_hei10_traces[i])
-        n = len(v)
-        plt.plot(np.linspace(0,1,n), v/65535)
-        plt.savefig(image_output_path+f'trace_{i}.png')
-        plt.close()
-        plt.figure()
-        plt.plot(np.linspace(0,1,n), v/65535)
-        plt.plot(np.linspace(0,1,n), np.median(v)*np.ones_like(v)/65535)
-        plt.savefig(image_output_path+f'trace_median_{i}.png')
-        plt.close()
-        print(A.iloc[i])
-
-        with open(image_output_path+f'trace_{i}.txt', 'w') as f:
-            for u in v:
-                f.write(f'{u:.02f}\n')
-    
-
         
 
-data_output_path = 'data_output/'
-data_output_path2 = 'data_output_test/'
-image_output_path='data_output_test/' 
+input_data_path = '../input_data/'
+source_data_path = '../source_data/'
+test_output_path = '../source_data_test/'
+
+
+os.makedirs(test_output_path, exist_ok=True)
 
 
 for image_output_base, csv_fn, max_n, stacked_bins, summary_fn, summary_fn2 in  [
-        ( image_output_path, 'test.csv',4, np.linspace(0, 0.3, 30), data_output_path2+'summary.txt', data_output_path2+'cell_summary.txt'),
-        ]:
+        ( test_output_path, source_data_path+'fig2_cytology.csv', 4, np.linspace(0, 0.3, 30), test_output_path+'summary.txt', test_output_path+'cell_summary.txt'),
+	( test_output_path+'ox_', source_data_path+'fig3_cytology.csv',  4, np.linspace(0, 0.12, 11), test_output_path+'summary_ox.txt', test_output_path+'cell_summary_ox.txt'),
+        ( test_output_path+'ux_', source_data_path+'fig4_cytology.csv',  3, np.linspace(0, 0.3, 10), test_output_path+'summary_ux.txt', test_output_path+'cell_summary_ux.txt'),
+
+
+]:
     A = pd.read_csv(csv_fn)
     plot_data(A, image_output_base,  max_n, stacked_bins, summary_fn, summary_fn2)
-    print(image_output_path)
 
-# Plots of HEI10 traces along individual chromosomes (used for panels in Fig1A, 3A and 4A)
-plot_traces(data_output_path+'test.pkl', '200406.csv', [675, 664, 492 ], image_output_path)
-plot_traces(data_output_path+'test_ox.pkl', 'OX.csv', [ 260], image_output_path)
-plot_traces(data_output_path+'test_ux.pkl', 'UX.csv', [ 115], image_output_path)

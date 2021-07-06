@@ -24,9 +24,11 @@ from rpy2.robjects.packages import importr
 
 utils = importr('utils')
 
-utils.chooseCRANmirror(ind=1)
-utils.install_packages('dunn.test')
-utils.install_packages('kruskal')
+## Uncomment if necessary
+
+#utils.chooseCRANmirror(ind=1)
+#utils.install_packages('dunn.test')
+#utils.install_packages('kruskal')
 
 import rpy2.robjects as robjects
 
@@ -43,14 +45,13 @@ mpl.rcParams.update({
     'axes.labelsize':28,
     'savefig.edgecolor': 'none',
     'savefig.facecolor': 'none',
-    
+    'svg.fonttype' : 'none',    
 })
 
 LARGE_FS=32
 
 from matplotlib import lines
 
-LARGE_FS = 32
 
 import cycler
 
@@ -95,7 +96,7 @@ def lin_fit(x, y, min_x=None, of=None, r2=False):
     else:
         return X, yy, est2.rsquared
 
-## Analysis of each dataset 
+## Analysis of each dataset (similar code as for data_analysis_plots)
 def analyse_data(A, data):
 
     all_peak_data = data['all_peak_data']
@@ -241,7 +242,6 @@ def plot_corr(A, image_output_path, data_fn):
 
 
     print(A.keys())
-
     # Restrict data to SCs from late cells with good quality traces
     A_late = A.loc[(A.all_stage=='late') & (A.all_quality==1)]
 
@@ -271,17 +271,13 @@ def plot_corr(A, image_output_path, data_fn):
     print('Data from {} SC'.format(len(A_late)))
 
 
-
     
     # Absolute SC length per crossover number
     
     plt.figure()
     data = []
-    NN = 3#np.max(A_late['num_sig_peaks'])
+    NN = 3
 
-    dl = ' '.join([ str(len(A_late['SC length'][A_late['num_sig_peaks']==i])) for i in range(1, np.max(A_late['num_sig_peaks'])+1) ])
-
-    
 
 
     print('NN', NN)
@@ -294,12 +290,6 @@ def plot_corr(A, image_output_path, data_fn):
         
     plt.violinplot(data, positions=range(1,NN+1), showmeans=True, vert=False)
 
-#    X, yy, r2 = lin_fit(total_SC_length, total_CO_number,  r2=True)
-#    plt.plot(X, yy, 'r-')
-
-#    plt.title(r'$r^2 = '+ f'{r2:.2f}'+r'$')
-    
-#    plt.text(0.1, 0.8, f'r^2 = {r2:.2f}', transform=plt.gca().transAxes)
 
 
     for i in range(3):
@@ -310,161 +300,27 @@ def plot_corr(A, image_output_path, data_fn):
     plt.xticks([20,40,60,80])
     plt.yticks([1,2,3])
     plt.xlim(15,85)
-#    plt.subplots_adjust(left=0.2, right=0.9, top=0.9, bottom=0.2)
-    plt.savefig('violin_number_length.svg')
+    plt.savefig(output_path+'/violin_number_length.svg')
 
-    plt.title(dl)
-    
-    plt.savefig('violin_number_length.png')
-
-    # Relative SC length vc crossover number
-
-    rel_lengths = []
-    CO_number = []
-
-    data = [[] for i in range(5)]
-    
-    for i in range(0, len(A), 5):
-        if A.Stage[i]=='late' and A.all_good[i]=='y':
-            lengths = A['SC length'][i:i+5]
-            lengths = lengths/np.sum(lengths)
-            num_peaks = A['num_sig_peaks'][i:i+5]
-            for l, n in zip(lengths, num_peaks):
-                if 1<=n<6:
-                    data[n-1].append(l)
-
-    plt.figure()
-    plt.violinplot(data, positions=range(1,6), showmeans=True)
-    plt.xlabel('CO Number')
-    plt.ylabel('SC rel length')
-    plt.subplots_adjust(left=0.2, right=0.9, top=0.9, bottom=0.2)
-    plt.savefig('violin_number_rel_length.svg')
-    plt.savefig('violin_number_rel_length.png')
-                    
-    
-
-    
-    # Total SC length vs total crossover number for each cell?
-
-    total_SC_length = []
-    total_CO_number = []
-
-    for i in range(0, len(A), 5):
-        if A.Stage[i]=='late' and A.all_good[i]=='y':
-            total_SC_length.append(np.sum(A['SC length'][i:i+5]))
-            total_CO_number.append(np.sum(A['num_sig_peaks'][i:i+5]))
-
-    plt.figure()
-    plt.scatter(total_SC_length, total_CO_number)
-
-    X, yy, r2 = lin_fit(total_SC_length, total_CO_number,  r2=True)
-    plt.plot(X, yy)
-    
-    plt.title(f'R2 = {r2:.2f}')
-    plt.xlabel('total SC length')
-    plt.ylabel('total CO number')
-    plt.subplots_adjust(left=0.2, right=0.9, top=0.9, bottom=0.2)
-    plt.savefig('total_SC_CO.svg')
-    plt.savefig('total_SC_CO.png')
-
-
-
-    rel_lengths = []
-    abs_lengths = []
-    CO_number = []
-
-    
-    for i in range(0, len(A), 5):
-        if A.Stage[i]=='late' and A.all_good[i]=='y':
-            lengths = A['SC length'][i:i+5]
-            abs_lengths += list(lengths)
-            lengths = lengths/np.sum(lengths)
-            num_peaks = A['num_sig_peaks'][i:i+5]
-            rel_lengths+= list(lengths)
-            CO_number += list(num_peaks)
-    
-
-    print('Max CO number', np.max(CO_number))
-
-    plt.figure()
-    plt.scatter(rel_lengths, CO_number)
-
-    X, yy, r2 = lin_fit(rel_lengths, CO_number,  r2=True)
-    plt.plot(X, yy)
-    plt.title(f'R2 = {r2:.2f}')
-    plt.xlabel('rel SC length')
-    plt.ylabel('CO number')
-    plt.subplots_adjust(left=0.2, right=0.9, top=0.9, bottom=0.2)
-    plt.savefig('rel_SC_CO.svg')
-    plt.savefig('rel_SC_CO.png')
-
-    plt.figure()
-    plt.scatter(abs_lengths, CO_number)
-
-    X, yy, r2 = lin_fit(abs_lengths, CO_number,  r2=True)
-    plt.plot(X, yy)
-    plt.title(f'R2 = {r2:.2f}')
-    plt.xlabel('SC length')
-    plt.ylabel('CO number')
-    plt.subplots_adjust(left=0.2, right=0.9, top=0.9, bottom=0.2)
-    plt.savefig('abs_SC_CO.svg')
-    plt.savefig('abs_SC_CO.png')
-
-    
-
-            
-    # Single / double / triple total HEI10 per SC
-    ncells = 0
-    norm_hei10 = []
-    norm_peaks = dict((i,[]) for i in range(1,4))
-    for i in range(0, len(A), 5):
-        if A.Stage[i]=='late' and A.all_good[i]=='y':
-            ncells +=1
-            hei10 = []
-            hei10_all = []
-            for j in range(i, i+5):
-                hei10.append(np.sum(A['new_peak_hei10'][j]))
-                hei10_all.append(A['new_peak_hei10'][j])
-            hei10 = np.array(hei10)
-            sc_hei10 = hei10/np.sum(hei10)
-            tot_hei10 = np.sum(hei10)
-            lengths = A['SC length'][i:i+5]
-            lengths = lengths/np.sum(lengths)
-            num_peaks = A['num_sig_peaks'][i:i+5]
-            for j, h in zip(num_peaks, hei10_all):
-                #print(j, h)
-                if j in norm_peaks:
-                    norm_peaks[j].append(np.sum(h)/tot_hei10)
-
-    label_map = { 1:'single', 2:'double', 3:'triple'}
-
-    plt.figure()
-    for i in range(1,4):
-        plt.hist(norm_peaks[i], histtype='step', label=label_map[i], density=True, lw=2)
-
-        
-    plt.xlabel('Relative HEI10 focus intensity')
-    plt.ylabel('Frequency density')
-    plt.legend()
-    plt.subplots_adjust(left=0.2, right=0.9, top=0.9, bottom=0.2)
-    plt.savefig('single_double_triple_SC_tot_new_intensities.svg')
-
-
-
-    
-    plt.show()
+    with open(output_path+'/violin_number_length_data.csv', 'w') as f:
+        f.write('num_sig_peaks, SC_length\n')
+        for i in range(1, NN+1):
+            d = data[i-1]
+            for v in np.array(d):
+                f.write(str(i) + ', ' + str(v) + '\n')
+                
             
     
 
-        
+import sys        
 
-data_output_path = 'data_output/'
-data_output_path2 = 'data_output/'
-image_output_path='data_output/' 
+input_path = '../input_data/'
+data_input_path = sys.argv[1]
+output_path = sys.argv[2]
 
 
 for image_output_base, csv_fn, data_fn in  [
-        ( image_output_path, '200406.csv', data_output_path+'test.pkl')
+        ( output_path, input_path+'/200406.csv', data_input_path+'/test.pkl')
         ]:
     A = pd.read_csv(csv_fn)
     plot_corr(A, image_output_base, data_fn)

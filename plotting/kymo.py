@@ -7,7 +7,7 @@ from scipy.interpolate import interp1d
 import matplotlib as mpl
 
 
-### Script to make matplotlib kymograph plot from 
+### Script to make matplotlib kymograph plot 
 
 
 mpl.rcParams.update({ #'figure.figsize': (6.0,4.0),  

@@ -106,7 +106,7 @@ def load_data(survey_dir, survey_base):
 import pandas as pd
 
 
-def make_data_files(data_path, output_prefix):
+def make_data_files(data_path, output_prefix, only_wt_density=False):
 
     # Load preprocessed pkl file
     new_data = load_data(*data_path) 
@@ -159,6 +159,8 @@ def make_data_files(data_path, output_prefix):
         
             L = to_val(h['L'])
             density = to_val(h['density'])
+            if density != 0.5 and only_wt_density:
+                continue
             K = to_val(h['K'])
             
             print('L, density, K', L, density, K)
@@ -198,7 +200,8 @@ def make_data_files(data_path, output_prefix):
 
         dataset = pd.DataFrame(dataset)
 
-        print(np.sum(dataset['Number COs']==0))
+        if not only_wt_density:
+            print('Zero crossover SCs', np.sum(dataset['Number COs']==0))
 
         dataset.to_csv(output_prefix+'density_{}.csv'.format(name), index=False)
 
@@ -213,14 +216,15 @@ def main(sim_data_path, output_path):
     #make_plots((sim_data_path+'/survey_escape/', 'at_'),  output_path+'/escape_',  intensity_bins=np.linspace(0,0.3,30))
 
     #return
-    make_data_files((sim_data_path+'/survey_julia_new_ends/', 'at_'), output_path+'/wt_')
-    make_data_files((sim_data_path+'/survey_julia_ox/', 'at_'),  output_path+'/ox_')
-    make_data_files((sim_data_path+'/survey_julia_ux/', 'at_'),  output_path+'/ux_')
-    make_data_files((sim_data_path+'/survey_julia_no_ends/', 'at_'), output_path+'/no_end_')
-    make_data_files((sim_data_path+'/survey_exp/', 'at_'),  output_path+'/exp_')
+    make_data_files((sim_data_path+'/survey_julia_new_ends/', 'at_'), output_path+'/fig2_simulations_')
+    make_data_files((sim_data_path+'/survey_julia_ox/', 'at_'),  output_path+'/fig3_simulations_')
+    make_data_files((sim_data_path+'/survey_julia_ux/', 'at_'),  output_path+'/fig4_simulations_')
+    make_data_files((sim_data_path+'/survey_julia_no_ends/', 'at_'), output_path+'/figS3_simulations_')
 
-    make_data_files((sim_data_path+'/survey_female/', 'at_'),  output_path+'/female_')
+    make_data_files((sim_data_path+'/survey_female/', 'at_'),  output_path+'/figS4b_simulations_', only_wt_density=True)
+
+    make_data_files((sim_data_path+'/survey_escape/', 'at_'), output_path+'/figS6_simulations_')
     
-main(sys.argv[1], sys.argv[2])
+main('../output', '../source_data')
                 
         

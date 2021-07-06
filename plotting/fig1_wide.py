@@ -32,12 +32,12 @@ def generate_figure(input_julia_path, input_data_path, output_path):
         return plot
         
         
-    chris_fig = get_file('extra_panels/HEI10 figure 1.14.svg', scale=1.0)
+    chris_fig = get_file('../extra_panels/HEI10 figure 1.14.svg', scale=1.0)
 
-    fig_panels = [ get_mpl_base('data_output/rel_length_tot_compare.svg', pos=(14,123)),
-                   get_mpl_base('data_output/new_rel_length.svg', pos=(65,123)),
-                   get_mpl_base('data_output/new_rel_length2.svg', pos=(111,123)),
-                   get_mpl_base('data_output/single_double_triple_peak_new_intensities_stacked.svg', pos=(155,123))]
+    fig_panels = [ get_mpl_base(input_data_path+'/rel_length_tot_compare.svg', pos=(14,123)),
+                   get_mpl_base(input_data_path+'/new_rel_length.svg', pos=(65,123)),
+                   get_mpl_base(input_data_path+'/new_rel_length2.svg', pos=(111,123)),
+                   get_mpl_base(input_data_path+'/single_double_triple_peak_new_intensities_stacked.svg', pos=(155,123))]
     
     gpage = sg.GroupElement([chris_fig]+fig_panels)
 

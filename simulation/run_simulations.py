@@ -70,7 +70,7 @@ my_env['JULIA_NUM_THREADS']='6' # Adjust this as appropriate for your CPU
 julia_path='/home/foz/JuliaPro-1.4.0-1/Julia/bin/julia' # Path to Julia executable 
 julia_options = []
 # Possible to precompile Julia packages to speed-up startup
-#julia_options = ["--sysimage", "nsim.so" ] # Cached 
+julia_options = ["--sysimage", "nsim.so" ] # Cached 
 
 
 import numpy as np

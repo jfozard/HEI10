@@ -141,9 +141,9 @@ position_4         NaN
 intensity_4        NaN
 """
 
-def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, max_n=4, max_k=4):
+def make_plots(input_csv_path, output_prefix, centre_plot=True, intensity_bins=None, max_n=4, max_k=4, do_density_plot=True):
     # Load preprocessed pkl file
-    new_data = pd.read_csv('test/wt_density_0.5.csv')
+    new_data = pd.read_csv(input_csv_path+'_density_0.5.csv')
 
 
     all_hist_n = np.zeros((19,))
@@ -175,7 +175,7 @@ def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, 
         s = new_data.iloc[i]
         print(s)
 
-        nco = s['Number COs']
+        nco = int(s['Number COs'])
         L = s['L']
         all_nco.append(nco)
 
@@ -278,11 +278,11 @@ def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, 
     plt.savefig(output_prefix+'diff.svg')
     
     
-    with open('H2A.csv') as f:
+    with open('../input_data/H2A.csv') as f:
         reader = csv.reader(f)
         H2A = list(reader)
 
-    with open('MHL1_diakinesis.csv') as f:
+    with open('../input_data/MHL1_diakinesis.csv') as f:
         reader = csv.reader(f)
         MHL = list(reader)
 
@@ -437,8 +437,6 @@ def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, 
     
         plt.plot(c[s], v[s], 'rx')
 
-        with open('centre2.pkl', 'wb') as f:
-            pickle.dump([c,v,s], f)
         
 
         X, yy, r = lin_fit(c[s], v[s], r2=True)
@@ -453,51 +451,61 @@ def make_plots(data_path, output_prefix, centre_plot=True, intensity_bins=None, 
     print(H2A, MHL)
 
 
-    dsb_density = []
-    CO_sim = []
+    if do_density_plot:
+        dsb_density = []
+        CO_sim = []
+
+        for d in ['0.25', '0.375', '0.5']:
+            data = pd.read_csv(input_csv_path+f'_density_{d}.csv') 
+            nf = np.sum(data['Number COs'])
+            nch = len(data)
+            dsb_density.append(float(d))
+            CO_sim.append(nf/nch)
+
+
+
+
+        dsb_density = np.array(dsb_density)
+        dsb_density = dsb_density/dsb_density[-1]
+
+        dsb_data = H2A/H2A[0]
+        CO_data = MHL[:3]/5
+
+        CO_data = CO_data/CO_data[0]
+
+
+        print('nf tot', nf_tot)
+
+        plt.figure()
+        CO_sim = np.array(CO_sim)
+        CO_sim = CO_sim/CO_sim[-1]
+
+
+        print(dsb_density, CO_sim)
+
+        plt.plot(dsb_density, CO_sim)
+        plt.plot(dsb_data, CO_data, 'rx')
+        plt.xlabel('Relative RI density')
+        plt.ylabel('Relative number of \nCOs per bivalent')
+
+
+        plt.savefig(output_prefix+'julia_hs.svg')
     
-    for d in ['0.25', '0.375', '0.5']:
-        data = pd.read_csv(f'test/wt_density_{d}.csv') 
-        nf = np.sum(data['Number COs'])
-        nch = len(data)
-        dsb_density.append(float(d))
-        CO_sim.append(nf/nch)
 
 
+source_data_path = '../source_data/'
+test_output_path = '../source_data_test_julia/'
 
-    
-    dsb_density = np.array(dsb_density)
-    dsb_density = dsb_density/dsb_density[-1]
-    
-    dsb_data = H2A/H2A[0]
-    CO_data = MHL[:3]/5
+os.makedirs(test_output_path, exist_ok=True)
 
-    CO_data = CO_data/CO_data[0]
+def main():
+    make_plots(source_data_path+'fig2_simulations',  test_output_path+'/new_end_', intensity_bins=np.linspace(0,0.3,30))
+    make_plots(source_data_path+'figS6_simulations',  test_output_path+'/escape_',  intensity_bins=np.linspace(0,0.3,30))
+    make_plots(source_data_path+'fig3_simulations',  test_output_path+'/ox_new_end_',  intensity_bins=np.linspace(0,0.12,11), max_n=7, centre_plot=False)
+    make_plots(source_data_path+'fig4_simulations',  test_output_path+'/ux_new_end_',  intensity_bins=np.linspace(0,0.3,30), max_n=3)
+    make_plots(source_data_path+'figS3_simulations',  test_output_path+'/no_end_',  intensity_bins=np.linspace(0,0.3,30))
+    make_plots(source_data_path+'figS4b_simulations',  test_output_path+'/female_',  intensity_bins=np.linspace(0,0.3,30), do_density_plot=False)
 
-
-    print('nf tot', nf_tot)
-    
-    plt.figure()
-    CO_sim = np.array(CO_sim)
-    CO_sim = CO_sim/CO_sim[-1]
-
-
-    print(dsb_density, CO_sim)
-    
-    plt.plot(dsb_density, CO_sim)
-    plt.plot(dsb_data, CO_data, 'rx')
-    plt.xlabel('Relative RI density')
-    plt.ylabel('Relative number of \nCOs per bivalent')
-
-
-    plt.savefig(output_prefix+'julia_hs.svg')
-    
-
-
-
-def main(sim_data_path, output_path):
-    make_plots((sim_data_path+'/survey_julia_new_ends/', 'at_'),  output_path+'/wt_',  intensity_bins=np.linspace(0,0.3,30))
-    
-main(sys.argv[1], sys.argv[2])
+main()
                 
         

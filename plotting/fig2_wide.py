@@ -5,6 +5,7 @@ import sys
 
 def generate_figure(input_julia_path, input_data_path, output_path):
     fig0 = sg.SVGFigure( "210mm", "297mm")
+    fig0.root.set("viewBox", "0 0 210 297")
 
 
     MPL_SCALE = 0.4
@@ -140,7 +141,7 @@ def generate_figure(input_julia_path, input_data_path, output_path):
     gall.scale_xy(0.9, 0.9)
     gall.moveto(30,280)
 
-    model = get_file("extra_panels/new_model.svg", scale=4)
+    model = get_file("../extra_panels/new_model.svg", scale=4)
 
     model.moveto(-10, -60)
 
@@ -150,7 +151,8 @@ def generate_figure(input_julia_path, input_data_path, output_path):
     gmodel = sg.GroupElement([model, alabel, blabel])
 
     gpage = sg.GroupElement([gmodel, gall])
-
+    gpage.scale_xy(0.26,0.26)
+    
 
     fig0.append([gpage])
 
